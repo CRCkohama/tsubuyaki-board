@@ -109,4 +109,45 @@ class PostListIntegrationTest {
         assertThat(authorIndex).isLessThan(bodyIndex);
         assertThat(bodyIndex).isLessThan(createdAtIndex);
     }
+
+    @Test
+    @DisplayName("投稿一覧_検索キーワードを指定したとき_部分一致する投稿のみ表示しキーワードをリテインする")
+    void 投稿一覧_検索キーワードを指定したとき_部分一致する投稿のみ表示しキーワードをリテインする() throws Exception {
+        postRepository.save(new Post("user1", "Javaプログラミングの基礎", LocalDateTime.now()));
+        postRepository.save(new Post("user2", "Spring BootでWebアプリ開発", LocalDateTime.now()));
+
+        mockMvc.perform(get("/posts").param("q", "Java"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("posts/list"))
+                .andExpect(model().attribute("q", "Java"))
+                .andExpect(content().string(containsString("Javaプログラミングの基礎")))
+                .andExpect(content().string(not(containsString("Spring BootでWebアプリ開発"))));
+    }
+
+    @Test
+    @DisplayName("投稿一覧_検索結果が0件のとき_該当なしメッセージを表示する")
+    void 投稿一覧_検索結果が0件のとき_該当なしメッセージを表示する() throws Exception {
+        postRepository.save(new Post("user1", "Javaプログラミングの基礎", LocalDateTime.now()));
+
+        mockMvc.perform(get("/posts").param("q", "Ruby"))
+                .andExpect(status().isOk())
+                .andExpect(view().name("posts/list"))
+                .andExpect(model().attribute("q", "Ruby"))
+                .andExpect(content().string(containsString("該当する投稿は見つかりませんでした")));
+    }
+
+    @Test
+    @DisplayName("投稿一覧_検索キーワードがスペースのみのとき_全件を表示する")
+    void 投稿一覧_検索キーワードがスペースのみのとき_全件を表示する() throws Exception {
+        postRepository.save(new Post("user1", "Javaプログラミングの基礎", LocalDateTime.now()));
+        postRepository.save(new Post("user2", "Spring BootでWebアプリ開発", LocalDateTime.now()));
+
+        mockMvc.perform(get("/posts").param("q", "   "))
+                .andExpect(status().isOk())
+                .andExpect(view().name("posts/list"))
+                .andExpect(model().attribute("q", "   "))
+                .andExpect(content().string(containsString("Javaプログラミングの基礎")))
+                .andExpect(content().string(containsString("Spring BootでWebアプリ開発")));
+    }
 }
+

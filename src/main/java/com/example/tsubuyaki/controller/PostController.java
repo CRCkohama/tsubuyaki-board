@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @Controller
 public class PostController {
@@ -31,8 +32,11 @@ public class PostController {
     }
 
     @GetMapping({ "/", "/posts" })
-    public String list(Model model) {
-        model.addAttribute("posts", postService.latest());
+    public String list(@RequestParam(value = "q", required = false) String query, Model model) {
+        // キーワード検索、または全件新着順表示（フォールバック）をServiceへ委譲して結果を取得します。
+        model.addAttribute("posts", postService.search(query));
+        // 入力した検索キーワードを画面の検索ボックスに再表示（リテイン）するためにModelへ格納します。
+        model.addAttribute("q", query);
         return "posts/list";
     }
 

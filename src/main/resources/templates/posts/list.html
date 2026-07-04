@@ -14,22 +14,36 @@
         |
         <a th:href="@{/posts/new}">新規投稿</a>
     </nav>
+    <!-- 検索キーワード入力用のフォーム。GETリクエストで/postsに送信します -->
+    <form class="search-form" method="get" th:action="@{/posts}">
+        <!-- th:valueを用いて検索キーワードをテキストボックスに再表示（リテイン）します。th:utextは不使用 -->
+        <input type="text" name="q" th:value="${q}" placeholder="キーワードで検索">
+        <button type="submit">検索</button>
+    </form>
+
     <form class="toolbar" method="get" th:action="@{/posts}">
         <button type="submit">更新</button>
     </form>
 
     <section>
-        <p th:if="${#lists.isEmpty(posts)}">まだ投稿はありません。最初の一言を投稿しよう。</p>
+        <!-- キーワードが指定されているが、検索結果が0件の場合のメッセージ -->
+        <p th:if="${#lists.isEmpty(posts) and q != null and !q.strip().isEmpty()}">該当する投稿は見つかりませんでした。</p>
+        <!-- キーワードが空、またはスペースのみで投稿が全く存在しない場合のメッセージ -->
+        <p th:if="${#lists.isEmpty(posts) and (q == null or q.strip().isEmpty())}">まだ投稿はありません。最初の一言を投稿しよう。</p>
+        <!-- 各投稿を表示するループ処理。投稿全体をクリック可能にするためaタグで内側を囲みます -->
         <article class="post" th:each="post : ${posts}">
-            <header>
-                <span class="post__author" th:text="${post.author}">投稿者</span>
-            </header>
-            <p class="post__body" th:text="${post.body}">本文</p>
-            <footer class="post__footer">
-                <time class="post__created-at"
-                      th:datetime="${post.createdAt}"
-                      th:text="${#temporals.format(post.createdAt, 'yyyy-MM-dd HH:mm')}">2026-05-23 09:00</time>
-            </footer>
+            <!-- 詳細画面（/posts/{id}）へのリンク。枠全体に広げるため block 要素に指定しています -->
+            <a th:href="@{/posts/{id}(id=${post.id})}" style="text-decoration: none; color: inherit; display: block;">
+                <header>
+                    <span class="post__author" th:text="${post.author}">投稿者</span>
+                </header>
+                <p class="post__body" th:text="${post.body}">本文</p>
+                <footer class="post__footer">
+                    <time class="post__created-at"
+                          th:datetime="${post.createdAt}"
+                          th:text="${#temporals.format(post.createdAt, 'yyyy-MM-dd HH:mm')}">2026-05-23 09:00</time>
+                </footer>
+            </a>
         </article>
     </section>
 </main>

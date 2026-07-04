@@ -32,4 +32,22 @@ public class PostService {
     public Post create(PostForm form) {
         return repository.save(new Post(form.getAuthor(), form.getBody(), LocalDateTime.now()));
     }
+
+    /**
+     * 指定されたキーワードで投稿を検索します。
+     * キーワードが未指定、空文字、または全角・半角スペースのみの場合は、
+     * 検索を行わずに従来の全件新着順表示（latest()）を返します。
+     * 
+     * @param query 検索キーワード
+     * @return 検索結果または全件の投稿リスト（最大50件）
+     */
+    public List<Post> search(String query) {
+        // キーワードがnull、または全角・半角スペースを除去した結果が空文字の場合はフォールバックします。
+        // String.strip() は全角スペース（\u3000）もトリミング対象に含みます。
+        if (query == null || query.strip().isEmpty()) {
+            return latest();
+        }
+        // 部分一致する投稿を新着順で最大50件検索します。
+        return repository.findTop50ByBodyContainingOrderByCreatedAtDesc(query);
+    }
 }
