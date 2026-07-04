@@ -1,5 +1,6 @@
 package com.example.tsubuyaki.controller;
 
+import com.example.tsubuyaki.domain.Post;
 import com.example.tsubuyaki.service.ClientHashGenerator;
 import com.example.tsubuyaki.service.PostLikeService;
 import com.example.tsubuyaki.service.PostService;
@@ -14,6 +15,10 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Controller
 public class PostController {
@@ -34,7 +39,16 @@ public class PostController {
     @GetMapping({ "/", "/posts" })
     public String list(@RequestParam(value = "q", required = false) String query, Model model) {
         // キーワード検索、または全件新着順表示（フォールバック）をServiceへ委譲して結果を取得します。
-        model.addAttribute("posts", postService.search(query));
+        List<Post> posts = postService.search(query);
+        model.addAttribute("posts", posts);
+
+        // 各投稿のいいね総数を集計し、投稿IDをキーとしたマップをModelへ格納します。
+        Map<Long, Long> likeCounts = posts.stream().collect(Collectors.toMap(
+                Post::getId,
+                post -> postLikeService.countByPostId(post.getId())
+        ));
+        model.addAttribute("likeCounts", likeCounts);
+
         // 入力した検索キーワードを画面の検索ボックスに再表示（リテイン）するためにModelへ格納します。
         model.addAttribute("q", query);
         return "posts/list";

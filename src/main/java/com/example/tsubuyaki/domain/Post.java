@@ -26,6 +26,10 @@ public class Post {
     @Column(name = "body", length = 280, nullable = false)
     private String body;
 
+    // アバター表示用のRGBカラーコード（#HEX値）を格納します。
+    @Column(name = "color", length = 7, nullable = false)
+    private String color;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -33,9 +37,16 @@ public class Post {
         // JPA
     }
 
+    // 互換性維持のためのカラー未指定コンストラクタ。デフォルト色としてブラック（#000000）を割り当てます。
     public Post(String author, String body, LocalDateTime createdAt) {
+        this(author, body, "#000000", createdAt);
+    }
+
+    // アバターカラー付きのメインコンストラクタです。
+    public Post(String author, String body, String color, LocalDateTime createdAt) {
         this.author = author;
         this.body = body;
+        this.color = color;
         this.createdAt = createdAt;
     }
 
@@ -49,6 +60,11 @@ public class Post {
 
     public String getBody() {
         return body;
+    }
+
+    // アバターのRGBカラー（#HEX形式）を取得します。
+    public String getColor() {
+        return color;
     }
 
     public LocalDateTime getCreatedAt() {

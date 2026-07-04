@@ -1,6 +1,7 @@
 package com.example.tsubuyaki.controller;
 
 import com.example.tsubuyaki.domain.Post;
+import com.example.tsubuyaki.domain.PostLike;
 import com.example.tsubuyaki.repository.PostRepository;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,13 +35,18 @@ class PostListIntegrationTest {
     @Autowired
     private PostRepository postRepository;
 
+    @Autowired
+    private com.example.tsubuyaki.repository.PostLikeRepository postLikeRepository;
+
     @BeforeEach
     void setUp() {
+        postLikeRepository.deleteAll();
         postRepository.deleteAll();
     }
 
     @AfterEach
     void tearDown() {
+        postLikeRepository.deleteAll();
         postRepository.deleteAll();
     }
 
@@ -148,6 +154,35 @@ class PostListIntegrationTest {
                 .andExpect(model().attribute("q", "   "))
                 .andExpect(content().string(containsString("Javaプログラミングの基礎")))
                 .andExpect(content().string(containsString("Spring BootでWebアプリ開発")));
+    }
+
+    @Test
+    @DisplayName("投稿一覧_投稿があるとき_アバターカラーがRGBインラインスタイルで適用されている")
+    void 投稿一覧_投稿があるとき_アバターカラーがRGBインラインスタイルで適用されている() throws Exception {
+        // 新コンストラクタはまだ未実装のためコンパイルエラーREDになります。
+        postRepository.save(new Post("user1", "カラーテスト用投稿", "#EF4444", LocalDateTime.now()));
+
+        mockMvc.perform(get("/posts"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("style=\"background-color: #EF4444;\"")))
+                .andExpect(content().string(containsString("user1")));
+    }
+
+    @Test
+    @DisplayName("投稿一覧_投稿にいいねがあるとき_いいね数がハートマークと共に表示される")
+    void 投稿一覧_投稿にいいねがあるとき_いいね数がハートマークと共に表示される() throws Exception {
+        Post post = postRepository.save(new Post("user1", "いいねテスト用投稿", "#EF4444", LocalDateTime.now()));
+        postLikeRepository.save(new PostLike(post, "hash1", LocalDateTime.now()));
+        postLikeRepository.save(new PostLike(post, "hash2", LocalDateTime.now()));
+
+        mockMvc.perform(get("/posts"))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("いいねテスト用投稿")))
+                // モデル属性 likeCounts にいいね数2が含まれていることを検証（未実装のためRED）
+                .andExpect(model().attributeExists("likeCounts"))
+                // HTML内にハートマーク(bi-heart-fill)といいね数「2」が含まれていることを検証（未実装のためRED）
+                .andExpect(content().string(containsString("bi-heart-fill")))
+                .andExpect(content().string(containsString("2")));
     }
 }
 

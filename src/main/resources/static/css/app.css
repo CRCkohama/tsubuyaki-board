@@ -1,60 +1,378 @@
-/* 最小スタイル — 受講生が必要に応じて拡張する */
+/* =========================================================================
+   社内つぶやきボード - クリーン・ライトデザインシステム
+   ========================================================================= */
+
+/* Google Fonts のインポート (Outfit: 英語・数字・見出し / Inter: 日本語・本文) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@500;600;700&display=swap');
+
 :root {
-    --color-bg: #fafafa;
-    --color-text: #222;
-    --color-accent: #1d4ed8;
-    --color-border: #e5e7eb;
-    --color-muted: #6b7280;
+    /* カラーパレット定義 (大企業SaaSやモダンツールで採用されているライトグレーテーマ) */
+    --color-bg: #F3F4F6;            /* 薄いグレー */
+    --color-panel-bg: #FFFFFF;       /* 純白のカード */
+    --color-panel-border: #E5E7EB;   /* 淡いグレーの境界線 */
+    --color-text-main: #1F2937;      /* 深いチャコール */
+    --color-text-muted: #6B7280;     /* ミュートされたグレー */
+    --color-accent-start: #4F46E5;   /* インディゴブルー */
+    --color-accent-end: #2563EB;     /* ロイヤルブルー */
+    --color-error: #EF4444;
+    --color-success: #10B981;
+    
+    /* 共通影・エフェクト */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.06);
+    --shadow-glow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+    --transition-smooth: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * {
     box-sizing: border-box;
+    margin: 0;
+    padding: 0;
 }
 
 body {
-    margin: 0;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
-                 "Noto Sans CJK JP", "Yu Gothic UI", sans-serif;
-    background: var(--color-bg);
-    color: var(--color-text);
+    background-color: var(--color-bg);
+    color: var(--color-text-main);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     line-height: 1.6;
+    min-height: 100vh;
+    padding-bottom: 3rem;
 }
 
 main {
-    max-width: 720px;
+    max-width: 680px;
     margin: 2rem auto;
-    padding: 0 1rem;
+    padding: 0 1.5rem;
 }
 
+/* タイポグラフィ */
 h1 {
-    font-size: 1.5rem;
+    font-family: 'Outfit', sans-serif;
+    font-size: 2.25rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    color: var(--color-text-main);
+    margin-bottom: 1.5rem;
+    text-align: center;
+}
+
+h2 {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 600;
     margin-bottom: 1rem;
 }
 
+/* ナビゲーションバー */
+nav {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+    font-family: 'Outfit', sans-serif;
+}
+
+nav a {
+    color: var(--color-text-muted);
+    text-decoration: none;
+    font-weight: 500;
+    transition: var(--transition-smooth);
+    padding: 0.35rem 0.75rem;
+    border-radius: 8px;
+}
+
+nav a:hover {
+    color: var(--color-text-main);
+    background-color: rgba(0, 0, 0, 0.04);
+}
+
+/* クリーンカード（共通パネル） */
+.glass-panel {
+    background: var(--color-panel-bg);
+    border: 1px solid var(--color-panel-border);
+    border-radius: 16px;
+    box-shadow: var(--shadow-md);
+    padding: 1.5rem;
+    transition: var(--transition-smooth);
+}
+
+/* 検索ツールバー */
+.search-form {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 1.5rem;
+}
+
+.search-form input[type="text"] {
+    flex: 1;
+    background: var(--color-panel-bg);
+    border: 1px solid var(--color-panel-border);
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    color: var(--color-text-main);
+    font-size: 0.95rem;
+    transition: var(--transition-smooth);
+    box-shadow: var(--shadow-sm);
+}
+
+.search-form input[type="text"]:focus {
+    outline: none;
+    border-color: var(--color-accent-start);
+    box-shadow: var(--shadow-glow);
+}
+
+/* 各種ボタン */
+button, .btn {
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: var(--transition-smooth);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+button[type="submit"], .btn-primary {
+    background: linear-gradient(135deg, var(--color-accent-start), var(--color-accent-end));
+    color: white;
+    box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+}
+
+button[type="submit"]:hover, .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(79, 70, 229, 0.3), var(--shadow-glow);
+}
+
+/* 更新フォーム（ツールバー） */
 .toolbar {
-    margin: 1rem 0;
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 1rem;
+}
+
+.toolbar button {
+    padding: 0.5rem 1rem;
+    font-size: 0.85rem;
+    background: var(--color-panel-bg);
+    border: 1px solid var(--color-panel-border);
+    color: var(--color-text-muted);
+    box-shadow: var(--shadow-sm);
+}
+
+.toolbar button:hover {
+    background: #F9FAFB;
+    color: var(--color-text-main);
+    border-color: rgba(0, 0, 0, 0.15);
+}
+
+/* 投稿カード */
+.post-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
 }
 
 .post {
-    padding: 1rem;
-    border: 1px solid var(--color-border);
-    border-radius: 8px;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+}
+
+.post:hover {
+    transform: translateY(-3px);
+    border-color: rgba(79, 70, 229, 0.25);
+    box-shadow: 0 12px 35px rgba(0, 0, 0, 0.08);
+}
+
+.post header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
     margin-bottom: 0.75rem;
-    background: white;
+}
+
+/* 丸型イニシャルアバター */
+.post__avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 700;
+    font-size: 1rem;
+    text-transform: uppercase;
+    box-shadow: var(--shadow-sm);
+    border: 2px solid white; /* 白枠を追加して目立たせます */
 }
 
 .post__author {
     font-weight: 600;
-}
-
-.post__created-at {
-    color: var(--color-muted);
-    font-size: 0.85rem;
+    font-size: 1rem;
+    color: var(--color-text-main);
 }
 
 .post__body {
-    margin-top: 0.5rem;
-    overflow-wrap: anywhere;
-    white-space: pre-wrap;
+    font-size: 1rem;
+    color: #374151; /* 少し濃いグレー */
+    margin-bottom: 0.75rem;
     word-break: break-word;
+    white-space: pre-wrap;
+}
+
+.post__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.post__created-at {
+    font-family: 'Outfit', sans-serif;
+    font-size: 0.8rem;
+    color: var(--color-text-muted);
+}
+
+/* フォームグループ */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    font-family: 'Outfit', sans-serif;
+    font-weight: 600;
+    font-size: 0.9rem;
+    margin-bottom: 0.5rem;
+    color: var(--color-text-muted);
+}
+
+.form-group input[type="text"],
+.form-group textarea {
+    width: 100%;
+    background: #F9FAFB;
+    border: 1px solid var(--color-panel-border);
+    border-radius: 10px;
+    padding: 0.85rem 1rem;
+    color: var(--color-text-main);
+    font-size: 0.95rem;
+    font-family: inherit;
+    transition: var(--transition-smooth);
+}
+
+.form-group input[type="text"]:focus,
+.form-group textarea:focus {
+    outline: none;
+    border-color: var(--color-accent-start);
+    background: #FFFFFF;
+    box-shadow: var(--shadow-glow);
+}
+
+/* エラーメッセージ */
+.error {
+    color: var(--color-error);
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+/* アバターカラー選択用ビジュアルカラーチップ（10色ラジオボタン） */
+.color-picker {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+}
+
+.color-picker__item {
+    position: relative;
+    cursor: pointer;
+}
+
+.color-picker__input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.color-picker__swatch {
+    height: 40px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 2px solid transparent;
+    transition: var(--transition-smooth);
+    box-shadow: var(--shadow-sm);
+}
+
+.color-picker__swatch::after {
+    content: '';
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: white;
+    opacity: 0;
+    transition: var(--transition-smooth);
+}
+
+/* 黒背景用のアバターチップ選択インジケーターをグレーにして視認性を高めます */
+.color-picker__item:first-child .color-picker__swatch::after {
+    background: #CCCCCC;
+}
+
+.color-picker__input:checked + .color-picker__swatch {
+    border-color: var(--color-accent-start);
+    transform: scale(1.05);
+    box-shadow: 0 0 10px rgba(79, 70, 229, 0.3);
+}
+
+.color-picker__input:checked + .color-picker__swatch::after {
+    opacity: 1;
+}
+
+/* いいねボタンセクション（詳細画面） */
+.likes {
+    margin-top: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid var(--color-panel-border);
+    padding-top: 1.5rem;
+}
+
+.likes p {
+    font-family: 'Outfit', sans-serif;
+    font-size: 1.1rem;
+    font-weight: 600;
+}
+
+.likes span {
+    color: #EC4899; /* ピンク */
+    font-size: 1.25rem;
+}
+
+.likes button {
+    background: linear-gradient(135deg, #EC4899, #8B5CF6);
+    box-shadow: 0 4px 12px rgba(236, 72, 153, 0.2);
+}
+
+.likes button:hover {
+    box-shadow: 0 6px 16px rgba(236, 72, 153, 0.3), 0 0 15px rgba(236, 72, 153, 0.15);
+}
+
+/* 空状態のメッセージ */
+.empty-message {
+    text-align: center;
+    padding: 3rem 1.5rem;
+    color: var(--color-text-muted);
+    font-size: 1rem;
 }

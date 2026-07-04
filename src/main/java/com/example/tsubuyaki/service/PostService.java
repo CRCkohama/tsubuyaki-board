@@ -30,7 +30,8 @@ public class PostService {
 
     @Transactional
     public Post create(PostForm form) {
-        return repository.save(new Post(form.getAuthor(), form.getBody(), LocalDateTime.now()));
+        // 新規投稿作成時にアバター色（form.getColor()）を引き渡してPostエンティティを生成・保存します。
+        return repository.save(new Post(form.getAuthor(), form.getBody(), form.getColor(), LocalDateTime.now()));
     }
 
     /**

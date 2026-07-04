@@ -51,7 +51,8 @@ class PostCreateIntegrationTest {
         mockMvc.perform(post("/posts")
                         .with(csrf())
                         .param("author", "a")
-                        .param("body", "b"))
+                        .param("body", "b")
+                        .param("color", "#EF4444"))
                 .andExpect(status().isFound())
                 .andExpect(redirectedUrl("/posts"));
 
@@ -60,18 +61,21 @@ class PostCreateIntegrationTest {
                 .satisfies(post -> {
                     assertThat(post.getAuthor()).isEqualTo("a");
                     assertThat(post.getBody()).isEqualTo("b");
+                    // getColor() はまだ定義されていないため、コンパイルエラーREDになります。
+                    assertThat(post.getColor()).isEqualTo("#EF4444");
                     assertThat(post.getCreatedAt()).isNotNull();
                 });
     }
 
-    @ParameterizedTest(name = "{2}")
+    @ParameterizedTest(name = "{3}")
     @MethodSource("invalidForms")
     @DisplayName("投稿登録_入力エラー_フォームを再表示し保存しない")
-    void 投稿登録_入力エラー_フォームを再表示し保存しない(String author, String body, String field) throws Exception {
+    void 投稿登録_入力エラー_フォームを再表示し保存しない(String author, String body, String color, String field) throws Exception {
         mockMvc.perform(post("/posts")
                         .with(csrf())
                         .param("author", author)
-                        .param("body", body))
+                        .param("body", body)
+                        .param("color", color))
                 .andExpect(status().isOk())
                 .andExpect(view().name("posts/form"))
                 .andExpect(model().attributeHasFieldErrors("postForm", field))
@@ -82,12 +86,18 @@ class PostCreateIntegrationTest {
 
     static Stream<Arguments> invalidForms() {
         return Stream.of(
-                Arguments.of("", "valid body", "author"),
-                Arguments.of("   ", "valid body", "author"),
-                Arguments.of("a".repeat(31), "valid body", "author"),
-                Arguments.of("valid author", "", "body"),
-                Arguments.of("valid author", "   ", "body"),
-                Arguments.of("valid author", "b".repeat(281), "body")
+                Arguments.of("", "valid body", "#EF4444", "author"),
+                Arguments.of("   ", "valid body", "#EF4444", "author"),
+                Arguments.of("a".repeat(31), "valid body", "#EF4444", "author"),
+                Arguments.of("valid author", "", "#EF4444", "body"),
+                Arguments.of("valid author", "   ", "#EF4444", "body"),
+                Arguments.of("valid author", "b".repeat(281), "#EF4444", "body"),
+                // color のバリデーションエラーテストケース
+                Arguments.of("valid author", "valid body", "", "color"),
+                Arguments.of("valid author", "valid body", "   ", "color"),
+                Arguments.of("valid author", "valid body", "invalid", "color"),
+                Arguments.of("valid author", "valid body", "#12345", "color"),
+                Arguments.of("valid author", "valid body", "#1234567", "color")
         );
     }
 }

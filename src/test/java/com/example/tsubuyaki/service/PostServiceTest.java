@@ -75,4 +75,24 @@ class PostServiceTest {
         assertThat(results).isEqualTo(expected);
         verify(repository).findTop50ByOrderByCreatedAtDesc();
     }
+
+    @Test
+    @DisplayName("作成_カラー情報を指定したとき_リポジトリ保存時にカラー情報が引き渡される")
+    void 作成_カラー情報を指定したとき_リポジトリ保存時にカラー情報が引き渡される() {
+        com.example.tsubuyaki.web.dto.PostForm form = new com.example.tsubuyaki.web.dto.PostForm();
+        form.setAuthor("user1");
+        form.setBody("サービス層のカラーテスト投稿");
+        // colorのsetter/getterはまだ未実装のためコンパイルエラーREDになります。
+        form.setColor("#EF4444");
+
+        Post savedPost = new Post("user1", "サービス層のカラーテスト投稿", "#EF4444", LocalDateTime.now());
+        when(repository.save(Mockito.any(Post.class))).thenReturn(savedPost);
+
+        Post result = service.create(form);
+
+        assertThat(result).isNotNull();
+        // PostService.create メソッド内で、渡されたカラーが Post にマッピングされているかをモックキャプチャなどで検証したいですが、
+        // 戻り値の Post（モックで返却するもの）または repository.save(arg) の引数検証を行います。
+        verify(repository).save(Mockito.argThat(post -> "#EF4444".equals(post.getColor())));
+    }
 }

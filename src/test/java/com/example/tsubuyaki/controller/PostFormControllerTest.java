@@ -16,6 +16,7 @@ import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasProperty;
 import static org.hamcrest.Matchers.instanceOf;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
@@ -48,7 +49,9 @@ class PostFormControllerTest {
                 .andExpect(model().attribute("postForm", allOf(
                         instanceOf(PostForm.class),
                         hasProperty("author", nullValue()),
-                        hasProperty("body", nullValue())
+                        hasProperty("body", nullValue()),
+                        // 初期値としてブラック（#000000）が設定されていることを検証します。
+                        hasProperty("color", is("#000000"))
                 )));
     }
 
@@ -62,6 +65,7 @@ class PostFormControllerTest {
                 .andExpect(content().string(containsString("name=\"author\"")))
                 .andExpect(content().string(containsString("本文")))
                 .andExpect(content().string(containsString("name=\"body\"")))
+                .andExpect(content().string(containsString("name=\"color\"")))
                 .andExpect(content().string(containsString("href=\"/posts\"")));
     }
 }

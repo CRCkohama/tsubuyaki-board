@@ -13,18 +13,72 @@
         <a th:href="@{/posts}">一覧に戻る</a>
     </nav>
 
-    <form th:action="@{/posts}" th:object="${postForm}" method="post">
-        <div>
-            <label for="author">投稿者</label>
-            <input type="text" id="author" th:field="*{author}" maxlength="30" required>
+    <!-- グラスモルフィズムのカードとしてフォーム全体を包みます -->
+    <form th:action="@{/posts}" th:object="${postForm}" method="post" class="glass-panel">
+        <div class="form-group">
+            <label for="author">投稿者名</label>
+            <input type="text" id="author" th:field="*{author}" maxlength="30" placeholder="お名前を入力してください" required>
+            <!-- 投稿者名のバリデーションエラーがあれば表示します -->
             <p class="error" th:if="${#fields.hasErrors('author')}" th:errors="*{author}">エラー</p>
         </div>
-        <div>
+
+        <!-- アバターカラー選択用カラーチップ。10色のカスタムラジオボタンでビジュアル表現します -->
+        <div class="form-group">
+            <label>アバターカラー</label>
+            <div class="color-picker">
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#000000" class="color-picker__input" checked>
+                    <span class="color-picker__swatch" style="background-color: #000000;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#3B82F6" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #3B82F6;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#10B981" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #10B981;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#EF4444" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #EF4444;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#F59E0B" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #F59E0B;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#8B5CF6" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #8B5CF6;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#EC4899" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #EC4899;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#F97316" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #F97316;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#14B8A6" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #14B8A6;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#6B7280" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #6B7280;"></span>
+                </label>
+            </div>
+            <!-- アバターカラーのバリデーションエラーがあれば表示します -->
+            <p class="error" th:if="${#fields.hasErrors('color')}" th:errors="*{color}">エラー</p>
+        </div>
+
+        <div class="form-group">
             <label for="body">本文 (280 文字まで)</label>
-            <textarea id="body" th:field="*{body}" maxlength="280" rows="4" required></textarea>
+            <textarea id="body" th:field="*{body}" maxlength="280" rows="4" placeholder="いまどうしてる？" required></textarea>
+            <!-- 本文のバリデーションエラーがあれば表示します -->
             <p class="error" th:if="${#fields.hasErrors('body')}" th:errors="*{body}">エラー</p>
         </div>
-        <button type="submit">投稿</button>
+
+        <button type="submit">投稿する</button>
     </form>
 </main>
 </body>

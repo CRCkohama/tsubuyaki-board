@@ -63,4 +63,16 @@ class PostRepositoryTest {
 
         assertThat(results).isEmpty();
     }
+
+    @Test
+    @DisplayName("投稿保存_カラー情報を指定したとき_正しく永続化され取得できる")
+    void 投稿保存_カラー情報を指定したとき_正しく永続化され取得できる() {
+        // 新しいカラー引数付きのコンストラクタを呼び出します（未実装のためコンパイルエラーREDになります）。
+        Post post = new Post("user1", "カラーテスト投稿", "#EF4444", LocalDateTime.now());
+        Post saved = postRepository.save(post);
+
+        Post found = postRepository.findById(saved.getId()).orElseThrow();
+        // getColor() も未実装のためコンパイルエラーREDになります。
+        assertThat(found.getColor()).isEqualTo("#EF4444");
+    }
 }

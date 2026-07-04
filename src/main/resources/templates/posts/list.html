@@ -11,30 +11,41 @@
     <h1>社内つぶやきボード</h1>
     <nav>
         <a th:href="@{/posts}">一覧</a>
-        |
         <a th:href="@{/posts/new}">新規投稿</a>
     </nav>
+
     <!-- 検索キーワード入力用のフォーム。GETリクエストで/postsに送信します -->
     <form class="search-form" method="get" th:action="@{/posts}">
-        <!-- th:valueを用いて検索キーワードをテキストボックスに再表示（リテイン）します。th:utextは不使用 -->
-        <input type="text" name="q" th:value="${q}" placeholder="キーワードで検索">
-        <button type="submit">検索</button>
+        <!-- th:valueを用いて検索キーワードをテキストボックスに再表示（リテイン）します -->
+        <input type="text" name="q" th:value="${q}" placeholder="キーワードで検索...">
+        <button type="submit" class="btn btn-primary">検索</button>
     </form>
 
+    <!-- タイムラインの更新ツールバー -->
     <form class="toolbar" method="get" th:action="@{/posts}">
-        <button type="submit">更新</button>
+        <button type="submit">タイムラインを更新</button>
     </form>
 
-    <section>
+    <!-- 投稿カード一覧セクション -->
+    <section class="post-list">
         <!-- キーワードが指定されているが、検索結果が0件の場合のメッセージ -->
-        <p th:if="${#lists.isEmpty(posts) and q != null and !q.strip().isEmpty()}">該当する投稿は見つかりませんでした。</p>
+        <p class="glass-panel empty-message" th:if="${#lists.isEmpty(posts) and q != null and !q.strip().isEmpty()}">
+            該当する投稿は見つかりませんでした。別のキーワードでお試しください。
+        </p>
         <!-- キーワードが空、またはスペースのみで投稿が全く存在しない場合のメッセージ -->
-        <p th:if="${#lists.isEmpty(posts) and (q == null or q.strip().isEmpty())}">まだ投稿はありません。最初の一言を投稿しよう。</p>
-        <!-- 各投稿を表示するループ処理。投稿全体をクリック可能にするためaタグで内側を囲みます -->
-        <article class="post" th:each="post : ${posts}">
+        <p class="glass-panel empty-message" th:if="${#lists.isEmpty(posts) and (q == null or q.strip().isEmpty())}">
+            まだ投稿はありません。最初の一言を投稿しよう。
+        </p>
+
+        <!-- 各投稿を表示するループ処理。投稿全体をクリック可能にするためaタグで囲み、グラスモルフィズムのスタイルをあてます -->
+        <article class="post glass-panel" th:each="post : ${posts}">
             <!-- 詳細画面（/posts/{id}）へのリンク。枠全体に広げるため block 要素に指定しています -->
             <a th:href="@{/posts/{id}(id=${post.id})}" style="text-decoration: none; color: inherit; display: block;">
                 <header>
+                    <!-- DBに保存されたRGBカラーを背景色として適用し、投稿者のイニシャル（先頭1文字）を表示します -->
+                    <span class="post__avatar" 
+                          th:style="'background-color: ' + ${post.color} + ';'" 
+                          th:text="${#strings.substring(post.author, 0, 1)}">A</span>
                     <span class="post__author" th:text="${post.author}">投稿者</span>
                 </header>
                 <p class="post__body" th:text="${post.body}">本文</p>
@@ -42,6 +53,13 @@
                     <time class="post__created-at"
                           th:datetime="${post.createdAt}"
                           th:text="${#temporals.format(post.createdAt, 'yyyy-MM-dd HH:mm')}">2026-05-23 09:00</time>
+                    <!-- 各投稿に紐づくいいね数をハートマークと共に表示します。イニシャルと同様にOutfitフォントで表現します。 -->
+                    <span class="post__likes" style="color: #EC4899; font-size: 0.9rem; display: inline-flex; align-items: center; gap: 0.25rem; font-family: 'Outfit', sans-serif; font-weight: 600;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" class="bi bi-heart-fill" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd" d="M8 1.314C12.438-3.248 23.534 4.735 8 15-7.534 4.736 3.562-3.248 8 1.314"/>
+                        </svg>
+                        <span th:text="${likeCounts[post.id]}">0</span>
+                    </span>
                 </footer>
             </a>
         </article>
