@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -29,6 +30,7 @@ public class PostController {
 
     private final ClientHashGenerator clientHashGenerator;
 
+    @SuppressFBWarnings("EI_EXPOSE_REP2")
     public PostController(PostService postService, PostLikeService postLikeService,
             ClientHashGenerator clientHashGenerator) {
         this.postService = postService;

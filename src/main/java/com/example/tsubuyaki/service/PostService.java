@@ -14,9 +14,11 @@ import java.util.List;
 public class PostService {
 
     private final PostRepository repository;
+    private final com.example.tsubuyaki.repository.TagRepository tagRepository;
 
-    public PostService(PostRepository repository) {
+    public PostService(PostRepository repository, com.example.tsubuyaki.repository.TagRepository tagRepository) {
         this.repository = repository;
+        this.tagRepository = tagRepository;
     }
 
     public List<Post> latest() {
@@ -30,8 +32,43 @@ public class PostService {
 
     @Transactional
     public Post create(PostForm form) {
-        // 新規投稿作成時にアバター色（form.getColor()）を引き渡してPostエンティティを生成・保存します。
-        return repository.save(new Post(form.getAuthor(), form.getBody(), form.getColor(), LocalDateTime.now()));
+        Post post = new Post(form.getAuthor(), form.getBody(), form.getColor(), LocalDateTime.now());
+
+        // カンマ区切りのタグ入力文字列をパースして登録します。
+        String tagsInput = form.getTagsInput();
+        if (tagsInput != null && !tagsInput.strip().isEmpty()) {
+            // カンマ、全角カンマ、読点で分割します。
+            String[] rawTags = tagsInput.split("[,，、]");
+            for (String rawTag : rawTags) {
+                String tagName = rawTag.strip();
+                if (!tagName.isEmpty()) {
+                    // 既存タグがあれば再利用し、なければ新規永続化します。
+                    com.example.tsubuyaki.domain.Tag tag = tagRepository.findByName(tagName)
+                            .orElseGet(() -> tagRepository.save(new com.example.tsubuyaki.domain.Tag(tagName)));
+                    post.getTags().add(tag);
+                }
+            }
+        }
+
+        return repository.save(post);
+    }
+
+    /**
+     * 指定された投稿から特定のタグの関連付けを解除（削除）します。
+     * 解除された結果、どの投稿からも紐付けられなくなったタグは自動でクリーンアップ（物理削除）します。
+     */
+    @Transactional
+    public void removeTagFromPost(Long postId, Long tagId) {
+        Post post = repository.findById(postId).orElseThrow(PostNotFoundException::new);
+        com.example.tsubuyaki.domain.Tag tag = tagRepository.findById(tagId).orElseThrow(TagNotFoundException::new);
+
+        post.removeTag(tag);
+        repository.save(post);
+
+        // 浮いたタグの判定：このタグに紐づくPostが存在しなければ、DBから削除します。
+        if (!repository.existsByTagsId(tagId)) {
+            tagRepository.delete(tag);
+        }
     }
 
     /**

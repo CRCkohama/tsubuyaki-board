@@ -17,12 +17,14 @@ import static org.mockito.Mockito.when;
 class PostServiceTest {
 
     private PostRepository repository;
+    private com.example.tsubuyaki.repository.TagRepository tagRepository;
     private PostService service;
 
     @BeforeEach
     void setUp() {
         repository = Mockito.mock(PostRepository.class);
-        service = new PostService(repository);
+        tagRepository = Mockito.mock(com.example.tsubuyaki.repository.TagRepository.class);
+        service = new PostService(repository, tagRepository);
     }
 
     @Test
@@ -94,5 +96,51 @@ class PostServiceTest {
         // PostService.create メソッド内で、渡されたカラーが Post にマッピングされているかをモックキャプチャなどで検証したいですが、
         // 戻り値の Post（モックで返却するもの）または repository.save(arg) の引数検証を行います。
         verify(repository).save(Mockito.argThat(post -> "#EF4444".equals(post.getColor())));
+    }
+
+    @Test
+    @DisplayName("作成_タグ情報を指定したとき_カンマ区切りでパースされて保存される")
+    void 作成_タグ情報を指定したとき_カンマ区切りでパースされて保存される() {
+        com.example.tsubuyaki.web.dto.PostForm form = new com.example.tsubuyaki.web.dto.PostForm();
+        form.setAuthor("user1");
+        form.setBody("本文");
+        form.setColor("#000000");
+        // tagsInputフィールドは未実装のためコンパイルエラーREDになります。
+        form.setTagsInput("java, spring, Web");
+
+        Post savedPost = new Post("user1", "本文", "#000000", LocalDateTime.now());
+        when(repository.save(Mockito.any(Post.class))).thenReturn(savedPost);
+        // タグ名「java」「spring」「Web」はいずれも新規タグであるとしてモックを設定
+        when(tagRepository.findByName(Mockito.anyString())).thenReturn(java.util.Optional.empty());
+        // saveされたTagそのものを返すモック挙動を設定してnull追加を防ぎます。フルパッケージ名でTagを指定します。
+        when(tagRepository.save(Mockito.any(com.example.tsubuyaki.domain.Tag.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        service.create(form);
+
+        // repository.save()に渡されたPostに、3つのタグが関連付けられていることを検証します。
+        verify(repository).save(Mockito.argThat(post -> {
+            return post.getTags() != null && post.getTags().size() == 3;
+        }));
+    }
+
+    @Test
+    @DisplayName("タグ削除_投稿からタグを指定したとき_関連付けが解除され浮いたタグも削除される")
+    void タグ削除_投稿からタグを指定したとき_関連付けが解除され浮いたタグも削除される() {
+        Post post = new Post("user1", "本文", "#000000", LocalDateTime.now());
+        com.example.tsubuyaki.domain.Tag tag = new com.example.tsubuyaki.domain.Tag("java");
+        post.getTags().add(tag);
+
+        when(repository.findById(1L)).thenReturn(java.util.Optional.of(post));
+        when(tagRepository.findById(2L)).thenReturn(java.util.Optional.of(tag));
+        // 中間テーブル等で、このタグを他に使用している投稿がない状態（浮いたタグ）をモック設定
+        when(repository.existsByTagsId(2L)).thenReturn(false);
+
+        // removeTagFromPostメソッドは未実装のためコンパイルエラーREDになります。
+        service.removeTagFromPost(1L, 2L);
+
+        // 投稿からタグが削除されていることをアサート
+        assertThat(post.getTags()).isEmpty();
+        // 浮いたタグがDBから削除されることをアサート
+        verify(tagRepository).delete(tag);
     }
 }

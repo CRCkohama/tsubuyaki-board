@@ -23,4 +23,10 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Post p WHERE p.id = :id")
     Optional<Post> findByIdForUpdate(@Param("id") Long id);
+
+    // 指定されたタグIDを持つ投稿が存在するかチェックします。タグ削除時の「浮いたタグ」判定に用います。
+    boolean existsByTagsId(Long tagId);
+
+    // 指定されたタグ名に関連する投稿を新着順で取得します。
+    List<Post> findByTagsNameOrderByCreatedAtDesc(String tagName);
 }

@@ -1,12 +1,17 @@
 package com.example.tsubuyaki.domain;
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.JoinTable;
+import jakarta.persistence.ManyToMany;
 import jakarta.persistence.SequenceGenerator;
 import jakarta.persistence.Table;
+import java.util.Set;
+import java.util.HashSet;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -32,6 +37,14 @@ public class Post {
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(
+            name = "post_tags",
+            joinColumns = @JoinColumn(name = "post_id"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    private Set<Tag> tags = new HashSet<>();
 
     protected Post() {
         // JPA
@@ -69,6 +82,16 @@ public class Post {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    // 投稿に紐付いているタグを取得します。
+    public Set<Tag> getTags() {
+        return tags;
+    }
+
+    // 投稿から指定されたタグの関連付けを解除（削除）します。
+    public void removeTag(Tag tag) {
+        this.tags.remove(tag);
     }
 
     @Override

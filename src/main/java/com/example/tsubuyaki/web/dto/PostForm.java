@@ -48,4 +48,17 @@ public class PostForm {
     public void setColor(String color) {
         this.color = color;
     }
+
+    // カンマ区切りのタグ入力用フィールドです。
+    private String tagsInput;
+
+    // タグ入力文字列を取得します。
+    public String getTagsInput() {
+        return tagsInput;
+    }
+
+    // タグ入力文字列を設定します。
+    public void setTagsInput(String tagsInput) {
+        this.tagsInput = tagsInput;
+    }
 }

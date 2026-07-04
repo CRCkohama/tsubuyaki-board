@@ -71,6 +71,14 @@
             <p class="error" th:if="${#fields.hasErrors('color')}" th:errors="*{color}">エラー</p>
         </div>
 
+        <!-- タグ入力用テキストボックス（カンマ区切りで複数指定可能） -->
+        <div class="form-group">
+            <label for="tagsInput">タグ（カンマ区切りで複数入力）</label>
+            <input type="text" id="tagsInput" th:field="*{tagsInput}" placeholder="例: java, spring, お知らせ">
+            <!-- タグ入力に関するバリデーションエラーがあれば表示します -->
+            <p class="error" th:if="${#fields.hasErrors('tagsInput')}" th:errors="*{tagsInput}">エラー</p>
+        </div>
+
         <div class="form-group">
             <label for="body">本文 (280 文字まで)</label>
             <textarea id="body" th:field="*{body}" maxlength="280" rows="4" placeholder="いまどうしてる？" required></textarea>
