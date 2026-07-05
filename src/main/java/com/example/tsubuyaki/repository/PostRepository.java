@@ -34,4 +34,7 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
     // 論理削除されているがゴミ箱から完全削除されていない投稿をすべて取得します。
     List<Post> findByDeletedAtIsNotNullAndPurgedAtIsNull();
+
+    // 削除状態に関わらず、すべての投稿から最新50件を新着順で取得します。
+    List<Post> findTop50ByOrderByCreatedAtDesc();
 }

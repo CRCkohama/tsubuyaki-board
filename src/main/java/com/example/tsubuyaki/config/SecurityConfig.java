@@ -12,6 +12,10 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         // 研修アプリでは認証を導入せず、全画面を許可したうえでCSRF保護だけを有効に保つ。
         http.authorizeHttpRequests(authorize -> authorize.anyRequest().permitAll());
+        
+        // REST API (/api/**) は外部からのGET等の連携を容易にするため、CSRF保護の対象外とします。
+        http.csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"));
+
         return http.build();
     }
 }

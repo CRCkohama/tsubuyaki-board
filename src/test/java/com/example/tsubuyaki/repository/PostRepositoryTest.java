@@ -133,4 +133,27 @@ class PostRepositoryTest {
                 .extracting(Post::getAuthor)
                 .containsExactly("user2");
     }
+
+    @Test
+    @DisplayName("全件取得_削除状態に関わらず最新50件を新着順で取得する")
+    void 全件取得_削除状態に関わらず最新50件を新着順で取得する() {
+        Post postActive = new Post("user1", "有効な投稿", "#000000", LocalDateTime.now().minusMinutes(2));
+        Post postDeleted = new Post("user2", "論理削除された投稿", "#3B82F6", LocalDateTime.now().minusMinutes(1));
+        postDeleted.delete();
+        Post postPurged = new Post("user3", "完全論理削除された投稿", "#EF4444", LocalDateTime.now());
+        postPurged.delete();
+        postPurged.purge();
+
+        postRepository.save(postActive);
+        postRepository.save(postDeleted);
+        postRepository.save(postPurged);
+        postRepository.flush();
+
+        // 削除状態に関わらない全件新着順最大50件取得クエリは未定義のため、コンパイルエラーREDになります。
+        List<Post> results = postRepository.findTop50ByOrderByCreatedAtDesc();
+        assertThat(results)
+                .hasSize(3)
+                .extracting(Post::getAuthor)
+                .containsExactly("user3", "user2", "user1");
+    }
 }
