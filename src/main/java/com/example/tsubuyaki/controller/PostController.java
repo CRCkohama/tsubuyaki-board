@@ -64,11 +64,16 @@ public class PostController {
     }
 
     @GetMapping("/posts/{id}")
-    public String detail(@PathVariable Long id, Model model) {
+    public String detail(@PathVariable Long id, Model model, HttpServletRequest request) {
         // パス変数のidに対応する投稿を取得し、詳細テンプレートで参照できるようpost属性へ格納する。
         model.addAttribute("post", postService.findById(id));
         // 詳細画面で現在のいいね総数を表示できるよう、投稿idに紐づく件数をModelへ格納する。
         model.addAttribute("likeCount", postLikeService.countByPostId(id));
+
+        // 投稿者本人の判定用として現在のクライアントハッシュを取得してModelに格納します。
+        String currentHash = clientHashGenerator.generate(request.getRemoteAddr(), request.getHeader("User-Agent"));
+        model.addAttribute("currentHash", currentHash);
+
         return "posts/detail";
     }
 
@@ -82,12 +87,14 @@ public class PostController {
     }
 
     @PostMapping("/posts")
-    public String create(@Valid @ModelAttribute("postForm") PostForm postForm, BindingResult bindingResult) {
+    public String create(@Valid @ModelAttribute("postForm") PostForm postForm, BindingResult bindingResult, HttpServletRequest request) {
         if (bindingResult.hasErrors()) {
             return "posts/form";
         }
 
-        postService.create(postForm);
+        // 作成者を識別するためのクライアントハッシュを生成し、保存時に渡します。
+        String clientHash = clientHashGenerator.generate(request.getRemoteAddr(), request.getHeader("User-Agent"));
+        postService.create(postForm, clientHash);
         return "redirect:/posts";
     }
 
@@ -135,5 +142,56 @@ public class PostController {
     public String emptyTrash() {
         postService.emptyTrash();
         return "redirect:/posts/trash";
+    }
+
+    /**
+     * 投稿編集画面を表示します。
+     * 作成者本人（クライアントハッシュ一致）のみ許可します。
+     */
+    @GetMapping("/posts/{id}/edit")
+    public String editForm(@PathVariable Long id, Model model, HttpServletRequest request) {
+        Post post = postService.findById(id);
+
+        // 本人確認：クライアントハッシュが一致しない場合は例外を発生させ403エラーにします。
+        String clientHash = clientHashGenerator.generate(request.getRemoteAddr(), request.getHeader("User-Agent"));
+        if (post.getClientHash() != null && !post.getClientHash().equals(clientHash)) {
+            throw new org.springframework.security.access.AccessDeniedException("編集権限がありません。");
+        }
+
+        // Formオブジェクトに現在の投稿内容を設定してModelへ格納します。
+        PostForm form = new PostForm();
+        form.setAuthor(post.getAuthor());
+        form.setBody(post.getBody());
+        form.setColor(post.getColor());
+        
+        // 既存タグをカンマ区切りの文字列にして設定します。
+        String tagsString = post.getTags().stream()
+                .map(com.example.tsubuyaki.domain.Tag::getName)
+                .collect(Collectors.joining(", "));
+        form.setTagsInput(tagsString);
+
+        model.addAttribute("postForm", form);
+        model.addAttribute("postId", id);
+        return "posts/edit";
+    }
+
+    /**
+     * 投稿の編集内容を保存します。
+     * 作成者本人（クライアントハッシュ一致）のみ許可します。
+     */
+    @PostMapping("/posts/{id}/edit")
+    public String edit(@PathVariable Long id,
+                       @Valid @ModelAttribute("postForm") PostForm form,
+                       BindingResult bindingResult,
+                       Model model,
+                       HttpServletRequest request) {
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("postId", id);
+            return "posts/edit";
+        }
+
+        String clientHash = clientHashGenerator.generate(request.getRemoteAddr(), request.getHeader("User-Agent"));
+        postService.updatePost(id, form, clientHash);
+        return "redirect:/posts/" + id;
     }
 }

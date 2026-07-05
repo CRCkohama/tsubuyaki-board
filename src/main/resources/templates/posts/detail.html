@@ -54,18 +54,26 @@
                 <time class="post__created-at"
                       th:datetime="${post.createdAt}"
                       th:text="${#temporals.format(post.createdAt, 'yyyy-MM-dd HH:mm')}">2026-05-23 09:00</time>
+                <!-- 投稿が編集されている場合は編集日時を横に表示します -->
+                <span th:if="${post.editedAt != null}" style="font-size: 0.85rem; color: var(--color-text-muted); margin-left: 0.5rem;">
+                    (編集済み: <time th:datetime="${post.editedAt}" th:text="${#temporals.format(post.editedAt, 'yyyy-MM-dd HH:mm')}"></time>)
+                </span>
             </footer>
         </article>
 
         <!-- いいね機能および削除アクションのセクション。美しくレイアウト調整します -->
-        <section class="likes" style="display: flex; align-items: center; justify-content: space-between; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(0, 0, 0, 0.06);">
-            <!-- いいねボタンと現在のカウント -->
-            <div style="display: flex; align-items: center; gap: 1rem;">
+        <section class="likes" style="display: flex; align-items: center; justify-content: space-between; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid rgba(0, 0, 0, 0.06); flex-wrap: wrap; gap: 1rem;">
+            <!-- いいねボタンと現在のカウント、および本人限定の編集ボタン -->
+            <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
                 <span style="font-size: 0.95rem; color: var(--color-text-muted);">いいね <span th:text="${likeCount}" style="font-weight: 600; color: #EC4899;">0</span> 件</span>
-                <form th:action="@{/posts/{id}/likes(id=${post.id})}" method="post">
+                <form th:action="@{/posts/{id}/likes(id=${post.id})}" method="post" style="margin: 0;">
                     <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
                     <button type="submit" class="btn" style="padding: 0.4rem 1.2rem; font-size: 0.9rem;">Like</button>
                 </form>
+                <!-- 編集ボタン（投稿のクライアントハッシュが一致する本人の場合のみ表示） -->
+                <div th:if="${post.clientHash != null and post.clientHash == currentHash}" style="margin: 0;">
+                    <a th:href="@{/posts/{id}/edit(id=${post.id})}" class="btn" style="background: var(--color-accent-start); color: #ffffff; padding: 0.4rem 1.2rem; font-size: 0.9rem; border: none; text-decoration: none; display: inline-flex; align-items: center; height: auto;">編集する</a>
+                </div>
             </div>
             <!-- インライン削除確認エリア。初期状態は削除ボタンのみ、クリックで確認表示に切り替えます -->
             <div id="delete-action-container">

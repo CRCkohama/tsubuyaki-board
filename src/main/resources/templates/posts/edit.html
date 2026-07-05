@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>投稿編集 - 社内つぶやきボード</title>
+    <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<main>
+    <h1>投稿の編集</h1>
+    <nav>
+        <a th:href="@{/posts/{id}(id=${postId})}">詳細に戻る</a>
+    </nav>
+
+    <!-- グラスモルフィズムのカードとして編集フォーム全体を包みます -->
+    <form th:action="@{/posts/{id}/edit(id=${postId})}" th:object="${postForm}" method="post" class="glass-panel">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+        
+        <div class="form-group">
+            <label for="author">投稿者名</label>
+            <!-- 投稿者名は編集不可（readonly）とします。送信できるようにするためhiddenではなくinputのreadonly表示とします -->
+            <input type="text" id="author" th:field="*{author}" readonly class="readonly-field" style="background: rgba(0, 0, 0, 0.05); cursor: not-allowed; border-color: rgba(0, 0, 0, 0.1);">
+            <p class="error" th:if="${#fields.hasErrors('author')}" th:errors="*{author}">エラー</p>
+        </div>
+
+        <!-- アバターカラー選択用カラーチップ。10色のカスタムラジオボタンでビジュアル表現します -->
+        <div class="form-group">
+            <label>アバターカラー</label>
+            <div class="color-picker">
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#000000" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #000000;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#3B82F6" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #3B82F6;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#10B981" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #10B981;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#EF4444" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #EF4444;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#F59E0B" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #F59E0B;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#8B5CF6" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #8B5CF6;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#EC4899" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #EC4899;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#F97316" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #F97316;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#14B8A6" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #14B8A6;"></span>
+                </label>
+                <label class="color-picker__item">
+                    <input type="radio" th:field="*{color}" value="#6B7280" class="color-picker__input">
+                    <span class="color-picker__swatch" style="background-color: #6B7280;"></span>
+                </label>
+            </div>
+            <p class="error" th:if="${#fields.hasErrors('color')}" th:errors="*{color}">エラー</p>
+        </div>
+
+        <!-- タグ入力用テキストボックス（カンマ区切りで複数指定可能） -->
+        <div class="form-group">
+            <label for="tagsInput">タグ（カンマ区切りで複数入力）</label>
+            <input type="text" id="tagsInput" th:field="*{tagsInput}" placeholder="例: java, spring, お知らせ">
+            <p class="error" th:if="${#fields.hasErrors('tagsInput')}" th:errors="*{tagsInput}">エラー</p>
+        </div>
+
+        <div class="form-group">
+            <label for="body">本文 (280 文字まで)</label>
+            <textarea id="body" th:field="*{body}" maxlength="280" rows="4" placeholder="編集内容を入力してください" required></textarea>
+            <p class="error" th:if="${#fields.hasErrors('body')}" th:errors="*{body}">エラー</p>
+        </div>
+
+        <button type="submit">変更を保存する</button>
+    </form>
+</main>
+</body>
+</html>

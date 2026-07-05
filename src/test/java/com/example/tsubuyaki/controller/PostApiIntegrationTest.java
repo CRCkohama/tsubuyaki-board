@@ -115,4 +115,26 @@ class PostApiIntegrationTest {
                 .andExpect(jsonPath("$.openapi", is("3.0.0")))
                 .andExpect(jsonPath("$.paths['/api/posts']").exists());
     }
+
+    @Test
+    @DisplayName("API投稿取得_編集された投稿が存在するとき_editedAtが返却される")
+    void API投稿取得_編集された投稿が存在するとき_editedAtが返却される() throws Exception {
+        Post post = new Post("user1", "元の本文", "#000000", LocalDateTime.now());
+        postRepository.save(post);
+
+        mockMvc.perform(get("/api/posts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].editedAt").value(is(org.hamcrest.Matchers.nullValue())));
+
+        // テスト用の疑似的な編集処理。update() は未定義のためコンパイルエラーREDになります。
+        post.update("更新後の本文", "#123456");
+        postRepository.saveAndFlush(post);
+
+        mockMvc.perform(get("/api/posts"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].body", is("更新後の本文")))
+                .andExpect(jsonPath("$[0].color", is("#123456")))
+                // editedAtがnullでないことを検証
+                .andExpect(jsonPath("$[0].editedAt", is(notNullValue())));
+    }
 }

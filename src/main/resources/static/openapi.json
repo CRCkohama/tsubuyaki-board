@@ -95,6 +95,12 @@
             "format": "date-time",
             "nullable": true,
             "description": "ゴミ箱から完全削除された日時（完全削除されていない場合は null）"
+          },
+          "editedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "編集された日時（未編集の場合は null）"
           }
         }
       }

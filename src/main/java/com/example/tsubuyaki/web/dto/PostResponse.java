@@ -21,6 +21,7 @@ public class PostResponse {
     private final int deleteStatus;
     private final String deletedAt;
     private final String purgedAt;
+    private final String editedAt;
 
     /**
      * PostエンティティからレスポンスDTOを構築します。
@@ -55,6 +56,11 @@ public class PostResponse {
             this.purgedAt = null;
             this.deletedAt = null;
         }
+
+        // 編集日時の設定
+        this.editedAt = post.getEditedAt() != null
+                ? post.getEditedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+                : null;
     }
 
     public Long getId() {
@@ -91,5 +97,9 @@ public class PostResponse {
 
     public String getPurgedAt() {
         return purgedAt;
+    }
+
+    public String getEditedAt() {
+        return editedAt;
     }
 }

@@ -91,7 +91,7 @@ class PostServiceTest {
         Post savedPost = new Post("user1", "サービス層のカラーテスト投稿", "#EF4444", LocalDateTime.now());
         when(repository.save(Mockito.any(Post.class))).thenReturn(savedPost);
 
-        Post result = service.create(form);
+        Post result = service.create(form, "hash123");
 
         assertThat(result).isNotNull();
         // PostService.create メソッド内で、渡されたカラーが Post にマッピングされているかをモックキャプチャなどで検証したいですが、
@@ -116,7 +116,7 @@ class PostServiceTest {
         // saveされたTagそのものを返すモック挙動を設定してnull追加を防ぎます。フルパッケージ名でTagを指定します。
         when(tagRepository.save(Mockito.any(com.example.tsubuyaki.domain.Tag.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        service.create(form);
+        service.create(form, "hash123");
 
         // repository.save()に渡されたPostに、3つのタグが関連付けられていることを検証します。
         verify(repository).save(Mockito.argThat(post -> {
@@ -213,5 +213,45 @@ class PostServiceTest {
         assertThat(post2.getPurgedAt()).isNotNull();
         // IDがnullのエンティティはequals()が重複するため、saveの総呼び出し回数をtimes(2)で検証します
         verify(repository, Mockito.times(2)).save(Mockito.any(Post.class));
+    }
+
+    @Test
+    @DisplayName("投稿編集_本人ハッシュが一致するとき_本文と色が更新されeditedAtが設定される")
+    void 投稿編集_本人ハッシュが一致するとき_本文と色が更新されeditedAtが設定される() throws Exception {
+        Post post = new Post("user1", "元の本文", "#000000", LocalDateTime.now());
+        // 反射等を使わずにSetterまたはコンストラクタ経由でclientHashを設定（未実装のためコンパイルエラーREDになります）
+        post.setClientHash("hash123");
+        when(repository.findById(1L)).thenReturn(java.util.Optional.of(post));
+
+        com.example.tsubuyaki.web.dto.PostForm form = new com.example.tsubuyaki.web.dto.PostForm();
+        form.setAuthor("user1");
+        form.setBody("新しい本文");
+        form.setColor("#123456");
+        form.setTagsInput("");
+
+        // updatePost() は未定義のためコンパイルエラーREDになります。
+        service.updatePost(1L, form, "hash123");
+
+        assertThat(post.getBody()).isEqualTo("新しい本文");
+        assertThat(post.getColor()).isEqualTo("#123456");
+        // getEditedAt() も未定義のためコンパイルエラーREDになります。
+        assertThat(post.getEditedAt()).isNotNull();
+        verify(repository).save(post);
+    }
+
+    @Test
+    @DisplayName("投稿編集_本人ハッシュが一致しないとき_例外を発生させる")
+    void 投稿編集_本人ハッシュが一致しないとき_例外を発生させる() {
+        Post post = new Post("user1", "元の本文", "#000000", LocalDateTime.now());
+        post.setClientHash("hash123");
+        when(repository.findById(1L)).thenReturn(java.util.Optional.of(post));
+
+        com.example.tsubuyaki.web.dto.PostForm form = new com.example.tsubuyaki.web.dto.PostForm();
+        form.setAuthor("user1");
+        form.setBody("新しい本文");
+        form.setColor("#123456");
+
+        assertThatThrownBy(() -> service.updatePost(1L, form, "hash999"))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     }
 }

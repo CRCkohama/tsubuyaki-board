@@ -36,8 +36,9 @@ public class PostService {
     }
 
     @Transactional
-    public Post create(PostForm form) {
+    public Post create(PostForm form, String clientHash) {
         Post post = new Post(form.getAuthor(), form.getBody(), form.getColor(), LocalDateTime.now());
+        post.setClientHash(clientHash);
 
         // カンマ区切りのタグ入力文字列をパースして登録します。
         String tagsInput = form.getTagsInput();
@@ -134,5 +135,63 @@ public class PostService {
             post.purge();
             repository.save(post);
         }
+    }
+
+    /**
+     * 投稿本文、アバター色、およびタグ情報を更新します。
+     * 投稿者本人（作成時のクライアントハッシュと一致）以外からの更新は拒否します。
+     */
+    @Transactional
+    public void updatePost(Long id, PostForm form, String clientHash) {
+        Post post = repository.findById(id).orElseThrow(PostNotFoundException::new);
+        if (post.isDeleted() || post.isPurged()) {
+            throw new PostNotFoundException();
+        }
+
+        // 本人確認：既存の clientHash が設定されている場合、リクエスト元のハッシュと一致するか検証します。
+        if (post.getClientHash() != null && !post.getClientHash().equals(clientHash)) {
+            throw new org.springframework.security.access.AccessDeniedException("編集権限がありません。");
+        }
+
+        // 本文とアバター色を更新します（editedAtも自動更新されます）
+        post.update(form.getBody(), form.getColor());
+
+        // 新しい入力タグリストの解析
+        java.util.Set<String> newTagNames = new java.util.HashSet<>();
+        String tagsInput = form.getTagsInput();
+        if (tagsInput != null && !tagsInput.strip().isEmpty()) {
+            String[] rawTags = tagsInput.split("[,，、]");
+            for (String rawTag : rawTags) {
+                String tagName = rawTag.strip();
+                if (!tagName.isEmpty()) {
+                    newTagNames.add(tagName);
+                }
+            }
+        }
+
+        // 紐付け解除するタグの抽出とクリーンアップ
+        java.util.Set<com.example.tsubuyaki.domain.Tag> currentTags = new java.util.HashSet<>(post.getTags());
+        for (com.example.tsubuyaki.domain.Tag tag : currentTags) {
+            if (!newTagNames.contains(tag.getName())) {
+                post.removeTag(tag);
+                // 浮いたタグの物理削除判定
+                repository.saveAndFlush(post); // 状態を一旦フラッシュして存在チェックの整合性を取ります
+                if (!repository.existsByTagsId(tag.getId())) {
+                    tagRepository.delete(tag);
+                }
+            }
+        }
+
+        // 新規追加タグの紐付け
+        for (String tagName : newTagNames) {
+            boolean alreadyLinked = post.getTags().stream().anyMatch(t -> t.getName().equals(tagName));
+            if (!alreadyLinked) {
+                com.example.tsubuyaki.domain.Tag tag = tagRepository.findByName(tagName)
+                        .orElseGet(() -> tagRepository.save(new com.example.tsubuyaki.domain.Tag(tagName)));
+                post.getTags().add(tag);
+            }
+        }
+
+        repository.save(post);
     }
 }

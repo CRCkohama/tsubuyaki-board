@@ -54,6 +54,14 @@ public class Post {
     @Column(name = "purged_at")
     private LocalDateTime purgedAt;
 
+    // 投稿作成者のクライアントハッシュを格納します。
+    @Column(name = "client_hash")
+    private String clientHash;
+
+    // 投稿が編集された日時を格納します。
+    @Column(name = "edited_at")
+    private LocalDateTime editedAt;
+
     protected Post() {
         // JPA
     }
@@ -135,6 +143,28 @@ public class Post {
     // 完全論理削除日時を取得します。
     public LocalDateTime getPurgedAt() {
         return purgedAt;
+    }
+
+    // 投稿作成者のクライアントハッシュを取得します。
+    public String getClientHash() {
+        return clientHash;
+    }
+
+    // 投稿作成者のクライアントハッシュを設定します。
+    public void setClientHash(String clientHash) {
+        this.clientHash = clientHash;
+    }
+
+    // 編集日時を取得します。
+    public LocalDateTime getEditedAt() {
+        return editedAt;
+    }
+
+    // 投稿本文とアバター色を更新し、編集日時を設定します。
+    public void update(String body, String color) {
+        this.body = body;
+        this.color = color;
+        this.editedAt = LocalDateTime.now();
     }
 
     @Override
