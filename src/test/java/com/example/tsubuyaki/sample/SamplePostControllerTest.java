@@ -41,6 +41,9 @@ class SamplePostControllerTest {
     @MockitoBean
     private ClientHashGenerator clientHashGenerator;
 
+    @MockitoBean
+    private com.example.tsubuyaki.repository.PostRepository postRepository;
+
     @Test
     @DisplayName("Controller_投稿一覧_GET_/posts_は posts/list ビューを返す")
     void getPosts_rendersListView() throws Exception {

@@ -40,7 +40,7 @@ class PostRepositoryTest {
 
         // キーワード「プログラミング」で検索を実行
         // 注: このメソッドはまだ PostRepository に定義されていないため、コンパイルエラー（RED）になります。
-        List<Post> results = postRepository.findTop50ByBodyContainingOrderByCreatedAtDesc("プログラミング");
+        List<Post> results = postRepository.findTop50ByBodyContainingAndDeletedAtIsNullAndPurgedAtIsNullOrderByCreatedAtDesc("プログラミング");
 
         // 検索結果の検証
         assertThat(results).hasSize(50); // 最大50件制限
@@ -59,7 +59,7 @@ class PostRepositoryTest {
     void キーワード検索_部分一致する投稿がないとき_空リストが返る() {
         postRepository.save(new Post("user1", "こんにちは世界", LocalDateTime.now()));
 
-        List<Post> results = postRepository.findTop50ByBodyContainingOrderByCreatedAtDesc("プログラミング");
+        List<Post> results = postRepository.findTop50ByBodyContainingAndDeletedAtIsNullAndPurgedAtIsNullOrderByCreatedAtDesc("プログラミング");
 
         assertThat(results).isEmpty();
     }
@@ -74,5 +74,63 @@ class PostRepositoryTest {
         Post found = postRepository.findById(saved.getId()).orElseThrow();
         // getColor() も未実装のためコンパイルエラーREDになります。
         assertThat(found.getColor()).isEqualTo("#EF4444");
+    }
+
+    @Test
+    @DisplayName("論理削除_クエリ各種_削除された投稿が結果から除外される")
+    void 論理削除_クエリ各種_削除された投稿が結果から除外される() {
+        Post postActive1 = new Post("user1", "有効な投稿1", "#000000", LocalDateTime.now());
+        Post postActive2 = new Post("user2", "有効な投稿2", "#3B82F6", LocalDateTime.now());
+
+        // deletedAt に値を持つ論理削除済み投稿を作成
+        Post postDeleted = new Post("user3", "削除された投稿", "#EF4444", LocalDateTime.now());
+        // delete() メソッドは未定義のため、コンパイルエラーREDになります。
+        postDeleted.delete();
+
+        postRepository.save(postActive1);
+        postRepository.save(postActive2);
+        postRepository.save(postDeleted);
+        postRepository.flush();
+
+        // 1. 全件取得での除外検証
+        // メソッド名変更のため、コンパイルエラーREDになります。
+        List<Post> allResults = postRepository.findTop50ByDeletedAtIsNullAndPurgedAtIsNullOrderByCreatedAtDesc();
+        assertThat(allResults)
+                .hasSize(2)
+                .extracting(Post::getAuthor)
+                .containsExactlyInAnyOrder("user1", "user2");
+
+        // 2. キーワード検索での除外検証
+        List<Post> searchResults = postRepository.findTop50ByBodyContainingAndDeletedAtIsNullAndPurgedAtIsNullOrderByCreatedAtDesc("投稿");
+        assertThat(searchResults)
+                .hasSize(2)
+                .extracting(Post::getAuthor)
+                .containsExactlyInAnyOrder("user1", "user2");
+    }
+
+    @Test
+    @DisplayName("ごみ箱_クエリ各種_論理削除されたかつ完全削除されていない投稿のみが結果に含まれる")
+    void ごみ箱_クエリ各種_論理削除されたかつ完全削除されていない投稿のみが結果に含まれる() {
+        Post postActive = new Post("user1", "有効な投稿", "#000000", LocalDateTime.now());
+
+        Post postDeleted = new Post("user2", "論理削除された投稿", "#3B82F6", LocalDateTime.now());
+        postDeleted.delete();
+
+        Post postPurged = new Post("user3", "完全論理削除された投稿", "#EF4444", LocalDateTime.now());
+        postPurged.delete();
+        // purge() は未定義のため、コンパイルエラーREDになります。
+        postPurged.purge();
+
+        postRepository.save(postActive);
+        postRepository.save(postDeleted);
+        postRepository.save(postPurged);
+        postRepository.flush();
+
+        // ゴミ箱一覧取得メソッドは未定義のため、コンパイルエラーREDになります。
+        List<Post> trashResults = postRepository.findByDeletedAtIsNotNullAndPurgedAtIsNullOrderByDeletedAtDesc();
+        assertThat(trashResults)
+                .hasSize(1)
+                .extracting(Post::getAuthor)
+                .containsExactly("user2");
     }
 }

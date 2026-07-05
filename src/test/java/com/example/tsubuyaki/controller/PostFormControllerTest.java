@@ -40,6 +40,9 @@ class PostFormControllerTest {
     @MockitoBean
     private ClientHashGenerator clientHashGenerator;
 
+    @MockitoBean
+    private com.example.tsubuyaki.repository.PostRepository postRepository;
+
     @Test
     @DisplayName("投稿作成フォーム_GET_posts_new_フォーム画面と空Formを返す")
     void 投稿作成フォーム_GET_posts_new_フォーム画面と空Formを返す() throws Exception {

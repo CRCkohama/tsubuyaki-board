@@ -12,12 +12,11 @@ import java.util.Optional;
 
 public interface PostRepository extends JpaRepository<Post, Long> {
 
-    // 最新の投稿50件を新着順で取得します。
-    List<Post> findTop50ByOrderByCreatedAtDesc();
+    // 論理削除およびゴミ箱から完全削除されていない最新の投稿50件を新着順で取得します。
+    List<Post> findTop50ByDeletedAtIsNullAndPurgedAtIsNullOrderByCreatedAtDesc();
 
-    // 指定されたキーワード（bodyの一部）に部分一致する投稿を、新着順で最大50件取得します。
-    // Spring Data JPAの派生クエリを使用することで、SQLインジェクション脆弱性を防ぎます。
-    List<Post> findTop50ByBodyContainingOrderByCreatedAtDesc(String body);
+    // 指定されたキーワードに部分一致し、かつ論理削除およびゴミ箱から完全削除されていない投稿を新着順で最大50件取得します。
+    List<Post> findTop50ByBodyContainingAndDeletedAtIsNullAndPurgedAtIsNullOrderByCreatedAtDesc(String body);
 
     // 未いいね状態ではpost_likesにロック対象行が無いため、必ず存在する親の投稿行をロックして同時トグルを直列化する。
     @Lock(LockModeType.PESSIMISTIC_WRITE)
@@ -27,6 +26,12 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     // 指定されたタグIDを持つ投稿が存在するかチェックします。タグ削除時の「浮いたタグ」判定に用います。
     boolean existsByTagsId(Long tagId);
 
-    // 指定されたタグ名に関連する投稿を新着順で取得します。
-    List<Post> findByTagsNameOrderByCreatedAtDesc(String tagName);
+    // 指定されたタグ名に関連し、かつ論理削除およびゴミ箱から完全削除されていない投稿を新着順で取得します。
+    List<Post> findByTagsNameAndDeletedAtIsNullAndPurgedAtIsNullOrderByCreatedAtDesc(String tagName);
+
+    // 論理削除されているがゴミ箱から完全削除されていない投稿を削除日時順で取得します。
+    List<Post> findByDeletedAtIsNotNullAndPurgedAtIsNullOrderByDeletedAtDesc();
+
+    // 論理削除されているがゴミ箱から完全削除されていない投稿をすべて取得します。
+    List<Post> findByDeletedAtIsNotNullAndPurgedAtIsNull();
 }

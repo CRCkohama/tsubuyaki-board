@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import com.example.tsubuyaki.repository.PostRepository;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import java.util.List;
 import java.util.Map;
@@ -25,15 +26,15 @@ import java.util.stream.Collectors;
 public class PostController {
 
     private final PostService postService;
-
+    private final PostRepository postRepository;
     private final PostLikeService postLikeService;
-
     private final ClientHashGenerator clientHashGenerator;
 
     @SuppressFBWarnings("EI_EXPOSE_REP2")
-    public PostController(PostService postService, PostLikeService postLikeService,
-            ClientHashGenerator clientHashGenerator) {
+    public PostController(PostService postService, PostRepository postRepository,
+            PostLikeService postLikeService, ClientHashGenerator clientHashGenerator) {
         this.postService = postService;
+        this.postRepository = postRepository;
         this.postLikeService = postLikeService;
         this.clientHashGenerator = clientHashGenerator;
     }
@@ -90,4 +91,49 @@ public class PostController {
         return "redirect:/posts";
     }
 
+    /**
+     * 指定された投稿を論理削除します。
+     * 削除処理完了後はタイムライン（/posts）へリダイレクトします。
+     */
+    @PostMapping("/posts/{id}/delete")
+    public String delete(@PathVariable Long id) {
+        postService.deletePost(id);
+        return "redirect:/posts";
+    }
+
+    /**
+     * ごみ箱（削除一覧）画面を表示します。
+     */
+    @GetMapping("/posts/trash")
+    public String trashList(Model model) {
+        List<Post> posts = postRepository.findByDeletedAtIsNotNullAndPurgedAtIsNullOrderByDeletedAtDesc();
+        model.addAttribute("posts", posts);
+
+        // 各投稿のいいね数を集計してModelへ格納します。
+        Map<Long, Long> likeCounts = posts.stream().collect(Collectors.toMap(
+                Post::getId,
+                post -> postLikeService.countByPostId(post.getId())
+        ));
+        model.addAttribute("likeCounts", likeCounts);
+
+        return "posts/trash";
+    }
+
+    /**
+     * 削除された投稿をごみ箱から元に戻します。
+     */
+    @PostMapping("/posts/{id}/restore")
+    public String restore(@PathVariable Long id) {
+        postService.restorePost(id);
+        return "redirect:/posts/trash";
+    }
+
+    /**
+     * ごみ箱を空にします。
+     */
+    @PostMapping("/posts/trash/empty")
+    public String emptyTrash() {
+        postService.emptyTrash();
+        return "redirect:/posts/trash";
+    }
 }

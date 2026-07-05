@@ -46,6 +46,14 @@ public class Post {
     )
     private Set<Tag> tags = new HashSet<>();
 
+    // 論理削除日時を格納します。nullの場合は未削除です。
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
+    // ゴミ箱から完全に削除された日時を格納します。
+    @Column(name = "purged_at")
+    private LocalDateTime purgedAt;
+
     protected Post() {
         // JPA
     }
@@ -92,6 +100,41 @@ public class Post {
     // 投稿から指定されたタグの関連付けを解除（削除）します。
     public void removeTag(Tag tag) {
         this.tags.remove(tag);
+    }
+
+    // 投稿を論理削除し、削除日時に現在日時を設定します。
+    public void delete() {
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    // 投稿がすでに論理削除されているかを判定します。
+    public boolean isDeleted() {
+        return this.deletedAt != null;
+    }
+
+    // 論理削除日時を取得します。
+    public LocalDateTime getDeletedAt() {
+        return deletedAt;
+    }
+
+    // 削除された投稿をごみ箱から元に戻します。
+    public void restore() {
+        this.deletedAt = null;
+    }
+
+    // ごみ箱内の投稿を完全に論理削除し、完全削除日時に現在日時を設定します。
+    public void purge() {
+        this.purgedAt = LocalDateTime.now();
+    }
+
+    // 投稿がすでにごみ箱からも完全に論理削除されているかを判定します。
+    public boolean isPurged() {
+        return this.purgedAt != null;
+    }
+
+    // 完全論理削除日時を取得します。
+    public LocalDateTime getPurgedAt() {
+        return purgedAt;
     }
 
     @Override

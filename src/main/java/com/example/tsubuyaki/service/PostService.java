@@ -22,12 +22,17 @@ public class PostService {
     }
 
     public List<Post> latest() {
-        return repository.findTop50ByOrderByCreatedAtDesc();
+        // 論理削除およびゴミ箱から完全削除されていない投稿のみを取得します。
+        return repository.findTop50ByDeletedAtIsNullAndPurgedAtIsNullOrderByCreatedAtDesc();
     }
 
     public Post findById(Long id) {
-        // 詳細画面では1件だけ取得し、存在しないidの場合はControllerへ404用の例外を伝える。
-        return repository.findById(id).orElseThrow(PostNotFoundException::new);
+        // 詳細画面では1件だけ取得し、存在しないid、または論理削除・完全削除されている場合は例外を伝えます。
+        Post post = repository.findById(id).orElseThrow(PostNotFoundException::new);
+        if (post.isDeleted() || post.isPurged()) {
+            throw new PostNotFoundException();
+        }
+        return post;
     }
 
     @Transactional
@@ -60,6 +65,9 @@ public class PostService {
     @Transactional
     public void removeTagFromPost(Long postId, Long tagId) {
         Post post = repository.findById(postId).orElseThrow(PostNotFoundException::new);
+        if (post.isDeleted() || post.isPurged()) {
+            throw new PostNotFoundException();
+        }
         com.example.tsubuyaki.domain.Tag tag = tagRepository.findById(tagId).orElseThrow(TagNotFoundException::new);
 
         post.removeTag(tag);
@@ -85,7 +93,46 @@ public class PostService {
         if (query == null || query.strip().isEmpty()) {
             return latest();
         }
-        // 部分一致する投稿を新着順で最大50件検索します。
-        return repository.findTop50ByBodyContainingOrderByCreatedAtDesc(query);
+        // 論理削除およびゴミ箱から完全削除されていない、かつキーワードに部分一致する投稿を検索します。
+        return repository.findTop50ByBodyContainingAndDeletedAtIsNullAndPurgedAtIsNullOrderByCreatedAtDesc(query);
+    }
+
+    /**
+     * 指定された投稿を論理削除します。
+     * すでに削除されている、または存在しないIDの場合は PostNotFoundException をスローします。
+     */
+    @Transactional
+    public void deletePost(Long id) {
+        Post post = repository.findById(id).orElseThrow(PostNotFoundException::new);
+        if (post.isDeleted() || post.isPurged()) {
+            throw new PostNotFoundException();
+        }
+        post.delete();
+        repository.save(post);
+    }
+
+    /**
+     * 論理削除された投稿をごみ箱から元に戻します。
+     */
+    @Transactional
+    public void restorePost(Long id) {
+        Post post = repository.findById(id).orElseThrow(PostNotFoundException::new);
+        if (post.isPurged()) {
+            throw new PostNotFoundException();
+        }
+        post.restore();
+        repository.save(post);
+    }
+
+    /**
+     * ごみ箱内のすべての投稿を完全に論理削除（クリア）します。
+     */
+    @Transactional
+    public void emptyTrash() {
+        List<Post> trashPosts = repository.findByDeletedAtIsNotNullAndPurgedAtIsNull();
+        for (Post post : trashPosts) {
+            post.purge();
+            repository.save(post);
+        }
     }
 }

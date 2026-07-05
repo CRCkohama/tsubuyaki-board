@@ -43,7 +43,7 @@ public class TagController {
     public String listByTag(@PathVariable String name, Model model) {
         Tag tag = tagRepository.findByName(name).orElseThrow(TagNotFoundException::new);
         
-        List<Post> posts = postRepository.findByTagsNameOrderByCreatedAtDesc(tag.getName());
+        List<Post> posts = postRepository.findByTagsNameAndDeletedAtIsNullAndPurgedAtIsNullOrderByCreatedAtDesc(tag.getName());
         model.addAttribute("posts", posts);
         model.addAttribute("tagName", tag.getName());
 
