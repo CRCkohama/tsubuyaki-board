@@ -1,0 +1,1441 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>階層型メモ・CSVビューア</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #f8fafc;
+      --bg-secondary: #ffffff;
+      --border-color: #e2e8f0;
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --success: #16a34a;
+      --success-hover: #15803d;
+      --list-hover: #f1f5f9;
+      --list-active: #e0e7ff;
+      --folder-color: #d97706;
+      --code-bg: #f1f5f9;
+      --table-header-bg: #f1f5f9;
+      --table-alt-row: #f8fafc;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    header {
+      background-color: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-color);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .nav-btn-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .icon-btn {
+      background: none;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      color: var(--text-primary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background-color 0.15s, border-color 0.15s, opacity 0.15s;
+    }
+
+    .icon-btn:hover:not(:disabled) {
+      background-color: var(--list-hover);
+      border-color: var(--accent);
+    }
+
+    .icon-btn:disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+      border-color: var(--border-color);
+    }
+
+    .icon-btn.active {
+      background-color: var(--list-active);
+      color: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .header-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-left: 6px;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background-color: var(--accent);
+      color: #fff;
+      padding: 7px 14px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: background-color 0.15s;
+    }
+
+    .action-btn:hover { background-color: var(--accent-hover); }
+    .action-btn.success { background-color: var(--success); }
+    .action-btn.success:hover { background-color: var(--success-hover); }
+
+    .action-btn.secondary {
+      background-color: transparent;
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+    .action-btn.secondary:hover { background-color: var(--list-hover); }
+
+    #legacyInput { display: none; }
+
+    .layout {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .sidebar {
+      width: 340px;
+      min-width: 200px;
+      max-width: 800px;
+      background-color: var(--bg-secondary);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+
+    .sidebar.collapsed { display: none; }
+
+    .sidebar-controls {
+      padding: 12px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .search-box {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    .search-box:focus { border-color: var(--accent); }
+
+    .mode-toggle-bar { display: flex; width: 100%; }
+
+    .view-mode-toggle {
+      display: inline-flex;
+      width: 100%;
+      background-color: var(--border-color);
+      border-radius: 6px;
+      padding: 2px;
+    }
+
+    .mode-btn {
+      flex: 1;
+      border: none;
+      background: transparent;
+      padding: 4px 8px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all 0.15s;
+      text-align: center;
+    }
+
+    .mode-btn.active {
+      background-color: #ffffff;
+      color: var(--accent);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .breadcrumb-container {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 4px;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      padding: 2px 0;
+      min-height: 24px;
+      word-break: break-all;
+    }
+
+    .crumb-item { cursor: pointer; color: var(--accent); text-decoration: none; }
+    .crumb-item:hover { text-decoration: underline; }
+    .crumb-separator { color: var(--text-secondary); }
+    .crumb-current { font-weight: 600; color: var(--text-primary); }
+
+    .sort-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      border-top: 1px dashed var(--border-color);
+      padding-top: 6px;
+    }
+
+    .sort-btn {
+      background: none;
+      border: none;
+      color: var(--accent);
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+
+    .item-list {
+      list-style: none;
+      overflow-y: auto;
+      flex: 1;
+    }
+
+    .list-row {
+      display: flex;
+      align-items: center;
+      padding: 9px 12px;
+      border-bottom: 1px solid var(--border-color);
+      cursor: pointer;
+      user-select: none;
+      transition: background-color 0.1s;
+      gap: 10px;
+    }
+
+    .list-row:hover { background-color: var(--list-hover); }
+    .list-row.active {
+      background-color: var(--list-active);
+      border-left: 3px solid var(--accent);
+    }
+
+    .row-icon { font-size: 1.05rem; flex-shrink: 0; }
+    .row-details { flex: 1; min-width: 0; }
+    .row-name {
+      font-size: 0.86rem;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .folder-row .row-name { color: var(--text-primary); font-weight: 600; }
+
+    .row-sub {
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      margin-top: 2px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .row-sub-path {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .resizer {
+      width: 5px;
+      cursor: col-resize;
+      background-color: var(--border-color);
+      transition: background-color 0.15s;
+      flex-shrink: 0;
+      user-select: none;
+      position: relative;
+    }
+
+    .resizer:hover, .resizer.dragging { background-color: var(--accent); }
+    .resizer.collapsed { display: none; }
+
+    body.is-resizing {
+      cursor: col-resize !important;
+      user-select: none !important;
+    }
+
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      background-color: var(--bg-secondary);
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .content-header {
+      padding: 8px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--bg-primary);
+      flex-shrink: 0;
+      gap: 16px;
+    }
+
+    .file-meta-area { min-width: 0; flex: 1; }
+
+    .current-file-name {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+
+    .current-file-path {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-controls-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .encoding-select {
+      font-size: 0.8rem;
+      padding: 4px 6px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background-color: #fff;
+      color: var(--text-primary);
+      outline: none;
+    }
+
+    .ctrl-btn { padding: 4px 10px; font-size: 0.8rem; }
+
+    .view-toggle {
+      display: inline-flex;
+      background-color: var(--border-color);
+      border-radius: 6px;
+      padding: 2px;
+    }
+
+    .toggle-btn {
+      border: none;
+      background: transparent;
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all 0.15s;
+    }
+
+    .toggle-btn.active {
+      background-color: #ffffff;
+      color: var(--accent);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .content-body {
+      flex: 1;
+      padding: 24px 32px;
+      overflow-y: auto;
+      position: relative;
+      scroll-behavior: smooth;
+    }
+
+    .empty-state {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      gap: 8px;
+    }
+
+    /* 編集エリア（ＭＳ ゴシック） */
+    .editor-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .edit-textarea {
+      width: 100%;
+      height: 100%;
+      padding: 16px;
+      font-family: "ＭＳ ゴシック", "MS Gothic", monospace;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      outline: none;
+      background-color: var(--bg-secondary);
+      color: var(--text-primary);
+      resize: none;
+    }
+
+    .edit-textarea:focus { border-color: var(--accent); }
+
+    /* ソース (Raw) 表示エリア（ＭＳ ゴシック） */
+    pre.raw-text {
+      font-family: "ＭＳ ゴシック", "MS Gothic", monospace;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--text-primary);
+    }
+
+    .markdown-body {
+      font-size: 0.95rem;
+      line-height: 1.7;
+      color: var(--text-primary);
+      max-width: 960px;
+    }
+
+    /* 段落内の単一改行は維持 */
+    .markdown-body p {
+      margin-bottom: 0.8em;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    /* リストの余白と改行制御 */
+    .markdown-body ul, .markdown-body ol {
+      margin-top: 0.3em;
+      margin-bottom: 0.8em;
+      padding-left: 2em;
+    }
+    .markdown-body li {
+      margin-bottom: 0.15em;
+      line-height: 1.5;
+      white-space: normal;
+    }
+    /* ネストされた子リストの余白（空行防止） */
+    .markdown-body li > ul,
+    .markdown-body li > ol {
+      margin-top: 0.1em;
+      margin-bottom: 0.1em;
+    }
+    /* リスト直下の段落：改行を維持したまま余白を抑制 */
+    .markdown-body li > p {
+      margin-top: 0.1em;
+      margin-bottom: 0.1em;
+      white-space: pre-wrap;
+    }
+
+    .markdown-body a {
+      color: var(--accent);
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .markdown-body a:hover { color: var(--accent-hover); }
+
+    .markdown-body blockquote {
+      margin: 1em 0;
+      padding: 0.5em 1em;
+      color: var(--text-secondary);
+      background-color: var(--bg-primary);
+      border-left: 4px solid var(--accent);
+      border-radius: 0 4px 4px 0;
+      white-space: pre-wrap;
+    }
+
+    .markdown-body code {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.88em;
+      background-color: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+    }
+
+    .markdown-body pre {
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 14px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 1em 0;
+      white-space: pre;
+    }
+
+    .markdown-body pre code { background: none; color: inherit; padding: 0; border: none; }
+    .markdown-body table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.9rem; }
+    .markdown-body th, .markdown-body td { border: 1px solid var(--border-color); padding: 8px 12px; text-align: left; }
+    .markdown-body th { background-color: var(--bg-primary); font-weight: 600; }
+    .markdown-body hr { border: 0; height: 1px; background-color: var(--border-color); margin: 1.5em 0; }
+
+    .csv-container { width: 100%; overflow-x: auto; }
+    .csv-table {
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      white-space: nowrap;
+      min-width: 100%;
+      border: 1px solid var(--border-color);
+    }
+
+    .csv-table th {
+      background-color: var(--table-header-bg);
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      text-align: left;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .csv-table td { border: 1px solid var(--border-color); padding: 6px 12px; }
+    .csv-table tr:nth-child(even) td { background-color: var(--table-alt-row); }
+    .csv-table tr:hover td { background-color: var(--list-hover); }
+
+    .csv-info-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-left">
+      <button id="toggleSidebarBtn" class="icon-btn" title="サイドメニューの表示/非表示 (Alt+B)">☰</button>
+      <div class="nav-btn-group">
+        <button id="btnHistoryBack" class="icon-btn" title="前のファイルに戻る (Alt+Left)" disabled>◀</button>
+        <button id="btnHistoryForward" class="icon-btn" title="次のファイルに進む (Alt+Right)" disabled>▶</button>
+      </div>
+      <div class="header-title">
+        <span>📝 階層型メモ・CSVビューア</span>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <button id="btnReload" class="action-btn secondary" title="フォルダ内を再スキャン">🔄 最新に更新</button>
+      <button id="btnOpenFolder" class="action-btn" title="フォルダを開く">📁 フォルダを開く</button>
+      <input type="file" id="legacyInput" webkitdirectory directory multiple>
+    </div>
+  </header>
+
+  <div class="layout" id="layoutContainer">
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-controls">
+        <input type="text" id="searchInput" class="search-box" placeholder="全ファイルを検索...">
+
+        <div class="mode-toggle-bar">
+          <div class="view-mode-toggle">
+            <button id="btnModeTree" class="mode-btn active" title="フォルダ階層ごとに表示">📁 階層表示</button>
+            <button id="btnModeFlat" class="mode-btn" title="全ファイルをフラットに一覧表示">📑 全件表示</button>
+          </div>
+        </div>
+
+        <div id="breadcrumb" class="breadcrumb-container">
+          <span class="crumb-current">フォルダ未選択</span>
+        </div>
+        <div class="sort-bar">
+          <span id="itemCount">0 項目</span>
+          <button id="sortToggle" class="sort-btn">日付: 新しい順 ▼</button>
+        </div>
+      </div>
+      <ul id="itemList" class="item-list"></ul>
+    </aside>
+
+    <div class="resizer" id="resizer" title="ドラッグして幅を調節"></div>
+
+    <main class="main-content">
+      <div id="contentHeader" class="content-header" style="display: none;">
+        <div class="file-meta-area">
+          <div id="selectedFileName" class="current-file-name"></div>
+          <div id="selectedFilePath" class="current-file-path"></div>
+        </div>
+
+        <div class="header-controls-right">
+          <button id="btnOpenMiniTab" class="action-btn secondary ctrl-btn" title="別タブで開く">🗗 別タブで開く</button>
+          <button id="btnEdit" class="action-btn secondary ctrl-btn" title="ファイルを編集">✏️ 編集</button>
+          <button id="btnSave" class="action-btn success ctrl-btn" style="display: none;" title="上書き保存 (Ctrl+S)">💾 保存</button>
+          <button id="btnCancelEdit" class="action-btn secondary ctrl-btn" style="display: none;" title="編集を破棄して戻る">キャンセル</button>
+
+          <select id="encodingSelect" class="encoding-select" title="文字コード手動切り替え">
+            <option value="auto">自動判別</option>
+            <option value="utf-8">UTF-8</option>
+            <option value="shift_jis">Shift_JIS</option>
+            <option value="euc-jp">EUC-JP</option>
+          </select>
+          <div class="view-toggle" id="viewToggleGroup">
+            <button id="btnPreview" class="toggle-btn active">プレビュー</button>
+            <button id="btnRaw" class="toggle-btn">ソース (Raw)</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="contentBody" class="content-body">
+        <div id="placeholder" class="empty-state">
+          <span>右上の「📁 フォルダを開く」をクリックしてください</span>
+        </div>
+        <div id="editorContainer" class="editor-container" style="display: none;">
+          <textarea id="editTextarea" class="edit-textarea" placeholder="テキストを入力..."></textarea>
+        </div>
+        <div id="markdownView" class="markdown-body" style="display: none;"></div>
+        <div id="csvView" class="csv-container" style="display: none;"></div>
+        <pre id="rawView" class="raw-text" style="display: none;"></pre>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    const USER_CONFIG = {
+      miniViewerHtml: '_memo_viewer_mini.html'
+    };
+
+    const SUPPORTED_EXTS = ['txt', 'md', 'markdown', 'log', 'text', 'csv', 'tsv'];
+
+    class FolderNode {
+      constructor(name, parent = null, handle = null) {
+        this.name = name;
+        this.parent = parent;
+        this.handle = handle;
+        this.subFolders = new Map();
+        this.files = [];
+      }
+    }
+
+    let rootDirectoryHandle = null;
+    let rootNode = null;
+    let currentFolderNode = null;
+    let allFilesList = [];
+    let activeFileItem = null;
+    let currentRawBuffer = null;
+    let currentRawContent = '';
+    let currentEncodingName = 'UTF-8';
+    let currentLineBreakName = 'LF';
+    let isPreviewMode = true;
+    let isEditMode = false;
+    let sortDesc = true;
+    let viewMode = 'tree';
+
+    let fileHistory = [];
+    let historyIndex = -1;
+    let isNavigatingHistory = false;
+    let miniViewerWindow = null;
+
+    const sidebar = document.getElementById('sidebar');
+    const resizer = document.getElementById('resizer');
+    const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+    const btnHistoryBack = document.getElementById('btnHistoryBack');
+    const btnHistoryForward = document.getElementById('btnHistoryForward');
+    const btnOpenFolder = document.getElementById('btnOpenFolder');
+    const btnReload = document.getElementById('btnReload');
+    const legacyInput = document.getElementById('legacyInput');
+    const itemListEl = document.getElementById('itemList');
+    const searchInput = document.getElementById('searchInput');
+    const breadcrumbEl = document.getElementById('breadcrumb');
+    const sortToggle = document.getElementById('sortToggle');
+    const itemCountEl = document.getElementById('itemCount');
+    const contentHeader = document.getElementById('contentHeader');
+    const selectedFileName = document.getElementById('selectedFileName');
+    const selectedFilePath = document.getElementById('selectedFilePath');
+    const contentBody = document.getElementById('contentBody');
+    const placeholder = document.getElementById('placeholder');
+    const editorContainer = document.getElementById('editorContainer');
+    const editTextarea = document.getElementById('editTextarea');
+    const markdownView = document.getElementById('markdownView');
+    const csvView = document.getElementById('csvView');
+    const rawView = document.getElementById('rawView');
+    const btnPreview = document.getElementById('btnPreview');
+    const btnRaw = document.getElementById('btnRaw');
+    const encodingSelect = document.getElementById('encodingSelect');
+    const btnOpenMiniTab = document.getElementById('btnOpenMiniTab');
+    const btnEdit = document.getElementById('btnEdit');
+    const btnSave = document.getElementById('btnSave');
+    const btnCancelEdit = document.getElementById('btnCancelEdit');
+    const viewToggleGroup = document.getElementById('viewToggleGroup');
+    const btnModeTree = document.getElementById('btnModeTree');
+    const btnModeFlat = document.getElementById('btnModeFlat');
+
+    /* --------------------------------------------------
+       フォルダを開く
+    -------------------------------------------------- */
+    btnOpenFolder.addEventListener('click', async () => {
+      if ('showDirectoryPicker' in window) {
+        try {
+          rootDirectoryHandle = await window.showDirectoryPicker();
+          fileHistory = [];
+          historyIndex = -1;
+          updateHistoryButtons();
+          if (isEditMode) exitEditMode();
+          await refreshAll();
+        } catch (err) {
+          if (err.name !== 'AbortError') console.error(err);
+        }
+      } else {
+        legacyInput.click();
+      }
+    });
+
+    legacyInput.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files);
+      if (files.length === 0) return;
+      buildLegacyTree(files);
+      renderSidebar();
+    });
+
+    /* --------------------------------------------------
+       別タブ（USER_CONFIG.miniViewerHtml）連携
+    -------------------------------------------------- */
+    function getFilePayload() {
+      if (!activeFileItem) return null;
+      return {
+        name: activeFileItem.name,
+        relativePath: activeFileItem.relativePath,
+        content: currentRawContent,
+        lastModified: activeFileItem.lastModified,
+        size: activeFileItem.size,
+        encoding: currentEncodingName,
+        lineBreak: currentLineBreakName,
+        isRawMode: !isPreviewMode
+      };
+    }
+
+    function sendFileViaMessage() {
+      if (!miniViewerWindow || miniViewerWindow.closed) return;
+      const payload = getFilePayload();
+      if (!payload) return;
+      try {
+        // Chrome向け：ファイルハンドルを含めて片道送信
+        miniViewerWindow.postMessage({
+          type: 'RENDER_FILE',
+          handle: activeFileItem ? activeFileItem.handle : null,
+          ...payload
+        }, '*');
+      } catch (e) {
+        // Edge向け（ハンドル複製拒否時）：テキストデータのみ送信
+        try {
+          miniViewerWindow.postMessage({ type: 'RENDER_FILE', ...payload }, '*');
+        } catch (err) {}
+      }
+    }
+
+    btnOpenMiniTab.addEventListener('click', () => {
+      const payload = getFilePayload();
+      if (!payload) return;
+
+      try {
+        const jsonStr = JSON.stringify(payload);
+        const encoded = encodeURIComponent(jsonStr);
+        if (encoded.length < 1500000) {
+          miniViewerWindow = window.open(`${USER_CONFIG.miniViewerHtml}#${encoded}`, '_blank');
+        } else {
+          miniViewerWindow = window.open(USER_CONFIG.miniViewerHtml, '_blank');
+        }
+      } catch (e) {
+        miniViewerWindow = window.open(USER_CONFIG.miniViewerHtml, '_blank');
+      }
+
+      setTimeout(sendFileViaMessage, 200);
+      setTimeout(sendFileViaMessage, 600);
+    });
+
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'MINI_VIEWER_READY') {
+        sendFileViaMessage();
+      }
+    });
+
+    /* --------------------------------------------------
+       ファイルシステム走査 & 表示
+    -------------------------------------------------- */
+    btnReload.addEventListener('click', async () => {
+      if (!rootDirectoryHandle && !rootNode) return;
+      if (isEditMode && !confirmLeaveEdit()) return;
+      if (isEditMode) exitEditMode();
+      await refreshAll();
+    });
+
+    window.addEventListener('focus', async () => {
+      if (activeFileItem && !isEditMode) {
+        await reloadCurrentFileOnly();
+      }
+    });
+
+    async function refreshAll() {
+      if (!rootDirectoryHandle) return;
+      const currentPath = currentFolderNode ? getNodePath(currentFolderNode) : [];
+      const activeRelPath = activeFileItem ? activeFileItem.relativePath : null;
+
+      allFilesList = [];
+      rootNode = new FolderNode(rootDirectoryHandle.name, null, rootDirectoryHandle);
+      await scanDirectoryHandle(rootDirectoryHandle, rootNode, rootDirectoryHandle.name);
+
+      currentFolderNode = findNodeByPath(rootNode, currentPath) || rootNode;
+      renderSidebar();
+
+      if (activeRelPath) {
+        const found = allFilesList.find(f => f.relativePath === activeRelPath);
+        if (found) await displayFileContent(found, false);
+      }
+    }
+
+    async function scanDirectoryHandle(dirHandle, parentNode, currentPath) {
+      for await (const entry of dirHandle.values()) {
+        if (entry.kind === 'directory') {
+          const subNode = new FolderNode(entry.name, parentNode, entry);
+          parentNode.subFolders.set(entry.name, subNode);
+          await scanDirectoryHandle(entry, subNode, `${currentPath}/${entry.name}`);
+        } else if (entry.kind === 'file') {
+          const ext = entry.name.split('.').pop().toLowerCase();
+          if (SUPPORTED_EXTS.includes(ext) || !entry.name.includes('.')) {
+            const fileObj = await entry.getFile();
+            const fileItem = {
+              name: entry.name,
+              relativePath: `${currentPath}/${entry.name}`,
+              handle: entry,
+              lastModified: fileObj.lastModified,
+              size: fileObj.size,
+              parent: parentNode
+            };
+            parentNode.files.push(fileItem);
+            allFilesList.push(fileItem);
+          }
+        }
+      }
+    }
+
+    async function reloadCurrentFileOnly() {
+      if (!activeFileItem || !activeFileItem.handle) return;
+      try {
+        const fileObj = await activeFileItem.handle.getFile();
+        if (fileObj.lastModified !== activeFileItem.lastModified || fileObj.size !== activeFileItem.size) {
+          activeFileItem.lastModified = fileObj.lastModified;
+          activeFileItem.size = fileObj.size;
+          currentRawBuffer = await fileObj.arrayBuffer();
+          applyEncodingAndRender();
+        }
+      } catch (e) {}
+    }
+
+    async function displayFileContent(item, addHistory = true) {
+      if (isEditMode) {
+        if (!confirmLeaveEdit()) return;
+        exitEditMode();
+      }
+
+      activeFileItem = item;
+      if (addHistory) recordHistory(item.relativePath);
+
+      if (viewMode === 'tree' && item.parent && currentFolderNode !== item.parent && !searchInput.value.trim()) {
+        currentFolderNode = item.parent;
+        renderSidebar();
+      } else {
+        const allRows = itemListEl.querySelectorAll('.list-row');
+        allRows.forEach(row => row.classList.remove('active'));
+        const activeEl = Array.from(allRows).find(r => r.dataset.path === item.relativePath);
+        if (activeEl) activeEl.classList.add('active');
+      }
+
+      try {
+        let fileObj = null;
+        if (item.handle) {
+          fileObj = await item.handle.getFile();
+          item.lastModified = fileObj.lastModified;
+          item.size = fileObj.size;
+        } else if (item.file) {
+          fileObj = item.file;
+        }
+
+        currentRawBuffer = await fileObj.arrayBuffer();
+        placeholder.style.display = 'none';
+        contentHeader.style.display = 'flex';
+
+        applyEncodingAndRender();
+        if (miniViewerWindow && !miniViewerWindow.closed) sendFileViaMessage();
+      } catch (err) {
+        alert('ファイルの読み込みに失敗しました。');
+      }
+    }
+
+    function decodeTextBuffer(buffer, targetEncoding) {
+      if (targetEncoding !== 'auto') {
+        const decoder = new TextDecoder(targetEncoding);
+        return { text: decoder.decode(buffer), detectedEncoding: targetEncoding.toUpperCase() };
+      }
+      try {
+        const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
+        return { text: utf8Decoder.decode(buffer), detectedEncoding: 'UTF-8' };
+      } catch (e) {}
+      try {
+        const sjisDecoder = new TextDecoder('shift_jis', { fatal: true });
+        return { text: sjisDecoder.decode(buffer), detectedEncoding: 'Shift_JIS' };
+      } catch (e) {}
+      try {
+        const eucDecoder = new TextDecoder('euc-jp', { fatal: true });
+        return { text: eucDecoder.decode(buffer), detectedEncoding: 'EUC-JP' };
+      } catch (e) {}
+      const fallbackDecoder = new TextDecoder('utf-8');
+      return { text: fallbackDecoder.decode(buffer), detectedEncoding: 'UTF-8 (破損あり)' };
+    }
+
+    function detectLineBreak(text) {
+      if (text.includes('\r\n')) return 'CRLF';
+      if (text.includes('\n')) return 'LF';
+      if (text.includes('\r')) return 'CR';
+      return '単一行';
+    }
+
+    encodingSelect.addEventListener('change', () => {
+      if (!currentRawBuffer || !activeFileItem) return;
+      applyEncodingAndRender();
+    });
+
+    function applyEncodingAndRender() {
+      const mode = encodingSelect.value;
+      const { text, detectedEncoding } = decodeTextBuffer(currentRawBuffer, mode);
+      currentRawContent = text;
+      currentEncodingName = detectedEncoding;
+      currentLineBreakName = detectLineBreak(text);
+      updateMetaInfo(activeFileItem, currentEncodingName, currentLineBreakName);
+      if (!isEditMode) renderEditorBody();
+    }
+
+    function updateMetaInfo(item, encoding, lineBreak) {
+      selectedFileName.textContent = item.name;
+      const sizeKb = (item.size / 1024).toFixed(1);
+      const dateStr = new Date(item.lastModified).toLocaleString('ja-JP');
+      selectedFilePath.textContent = `${item.relativePath} [${encoding} / 改行:${lineBreak}] (${sizeKb} KB / 更新: ${dateStr})`;
+    }
+
+    function renderEditorBody() {
+      if (!activeFileItem) return;
+      const ext = activeFileItem.name.split('.').pop().toLowerCase();
+      const isCsv = (ext === 'csv');
+      const isTsv = (ext === 'tsv');
+
+      if (isPreviewMode) {
+        rawView.style.display = 'none';
+        if (isCsv || isTsv) {
+          markdownView.style.display = 'none';
+          csvView.style.display = 'block';
+          csvView.innerHTML = renderCSVTable(currentRawContent, isTsv ? '\t' : ',');
+        } else {
+          csvView.style.display = 'none';
+          markdownView.style.display = 'block';
+          markdownView.innerHTML = renderMarkdown(currentRawContent);
+          attachHeadingIds(markdownView);
+        }
+      } else {
+        markdownView.style.display = 'none';
+        csvView.style.display = 'none';
+        rawView.style.display = 'block';
+        rawView.textContent = currentRawContent;
+      }
+    }
+
+    /* --------------------------------------------------
+       エディタ編集 & 保存
+    -------------------------------------------------- */
+    btnEdit.addEventListener('click', () => enterEditMode());
+
+    btnCancelEdit.addEventListener('click', () => {
+      if (editTextarea.value !== currentRawContent) {
+        if (!confirm('変更内容を破棄して戻りますか？')) return;
+      }
+      exitEditMode();
+      renderEditorBody();
+    });
+
+    btnSave.addEventListener('click', async () => saveCurrentFile());
+
+    function enterEditMode() {
+      if (!activeFileItem) return;
+      isEditMode = true;
+      editTextarea.value = currentRawContent;
+      markdownView.style.display = 'none';
+      csvView.style.display = 'none';
+      rawView.style.display = 'none';
+      editorContainer.style.display = 'flex';
+
+      btnEdit.style.display = 'none';
+      btnSave.style.display = 'inline-flex';
+      btnCancelEdit.style.display = 'inline-flex';
+      viewToggleGroup.style.display = 'none';
+      encodingSelect.disabled = true;
+      editTextarea.focus();
+    }
+
+    function exitEditMode() {
+      isEditMode = false;
+      editorContainer.style.display = 'none';
+      btnEdit.style.display = 'inline-flex';
+      btnSave.style.display = 'none';
+      btnCancelEdit.style.display = 'none';
+      viewToggleGroup.style.display = 'inline-flex';
+      encodingSelect.disabled = false;
+    }
+
+    async function saveCurrentFile() {
+      if (!activeFileItem) return;
+      const newText = editTextarea.value;
+      try {
+        if (activeFileItem.handle && activeFileItem.handle.createWritable) {
+          const writable = await activeFileItem.handle.createWritable();
+          await writable.write(newText);
+          await writable.close();
+
+          currentRawContent = newText;
+          currentRawBuffer = new TextEncoder().encode(newText).buffer;
+          const fileObj = await activeFileItem.handle.getFile();
+          activeFileItem.lastModified = fileObj.lastModified;
+          activeFileItem.size = fileObj.size;
+        }
+        exitEditMode();
+        applyEncodingAndRender();
+        renderSidebar();
+        if (miniViewerWindow && !miniViewerWindow.closed) sendFileViaMessage();
+      } catch (err) {
+        alert('保存に失敗しました: ' + err.message);
+      }
+    }
+
+    window.addEventListener('keydown', async (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        if (isEditMode) {
+          e.preventDefault();
+          await saveCurrentFile();
+        }
+      }
+    });
+
+    /* --------------------------------------------------
+       UI & サイドバー制御
+    -------------------------------------------------- */
+    function setViewMode(mode) {
+      viewMode = mode;
+      if (mode === 'tree') {
+        btnModeTree.classList.add('active');
+        btnModeFlat.classList.remove('active');
+      } else {
+        btnModeFlat.classList.add('active');
+        btnModeTree.classList.remove('active');
+      }
+      renderSidebar();
+    }
+
+    btnModeTree.addEventListener('click', () => setViewMode('tree'));
+    btnModeFlat.addEventListener('click', () => setViewMode('flat'));
+
+    sortToggle.addEventListener('click', () => {
+      sortDesc = !sortDesc;
+      sortToggle.textContent = sortDesc ? '日付: 新しい順 ▼' : '日付: 古い順 ▲';
+      renderSidebar();
+    });
+
+    searchInput.addEventListener('input', () => renderSidebar());
+
+    btnPreview.addEventListener('click', () => {
+      if (isPreviewMode) return;
+      isPreviewMode = true;
+      btnPreview.classList.add('active');
+      btnRaw.classList.remove('active');
+      renderEditorBody();
+    });
+
+    btnRaw.addEventListener('click', () => {
+      if (!isPreviewMode) return;
+      isPreviewMode = false;
+      btnRaw.classList.add('active');
+      btnPreview.classList.remove('active');
+      renderEditorBody();
+    });
+
+    toggleSidebarBtn.addEventListener('click', () => {
+      sidebar.classList.toggle('collapsed');
+      resizer.classList.toggle('collapsed');
+      toggleSidebarBtn.classList.toggle('active');
+    });
+
+    let isResizing = false;
+    resizer.addEventListener('mousedown', () => {
+      isResizing = true;
+      resizer.classList.add('dragging');
+      document.body.classList.add('is-resizing');
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    });
+
+    function handleMouseMove(e) {
+      if (!isResizing) return;
+      sidebar.style.width = `${Math.max(200, Math.min(e.clientX, window.innerWidth - 300))}px`;
+    }
+
+    function handleMouseUp() {
+      if (!isResizing) return;
+      isResizing = false;
+      resizer.classList.remove('dragging');
+      document.body.classList.remove('is-resizing');
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    }
+
+    function recordHistory(path) {
+      if (isNavigatingHistory) return;
+      if (fileHistory.length > 0 && fileHistory[historyIndex] === path) return;
+      fileHistory = fileHistory.slice(0, historyIndex + 1);
+      fileHistory.push(path);
+      historyIndex = fileHistory.length - 1;
+      updateHistoryButtons();
+    }
+
+    function updateHistoryButtons() {
+      btnHistoryBack.disabled = (historyIndex <= 0);
+      btnHistoryForward.disabled = (historyIndex >= fileHistory.length - 1);
+    }
+
+    btnHistoryBack.addEventListener('click', () => {
+      if (historyIndex > 0) {
+        historyIndex--;
+        const target = allFilesList.find(f => f.relativePath === fileHistory[historyIndex]);
+        if (target) displayFileContent(target, false);
+        updateHistoryButtons();
+      }
+    });
+
+    btnHistoryForward.addEventListener('click', () => {
+      if (historyIndex < fileHistory.length - 1) {
+        historyIndex++;
+        const target = allFilesList.find(f => f.relativePath === fileHistory[historyIndex]);
+        if (target) displayFileContent(target, false);
+        updateHistoryButtons();
+      }
+    });
+
+    function renderSidebar() {
+      if (!rootNode) return;
+      const keyword = searchInput.value.trim().toLowerCase();
+      if (keyword) { renderSearchResults(keyword); return; }
+      if (viewMode === 'flat') { renderFlatList(); }
+      else { renderBreadcrumbs(); renderDirectoryContents(); }
+    }
+
+    function renderFlatList() {
+      breadcrumbEl.innerHTML = `<span class="crumb-current">📑 全件一覧 (${allFilesList.length} 件)</span>`;
+      itemListEl.innerHTML = '';
+      const sorted = [...allFilesList].sort((a, b) => sortDesc ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name));
+      itemCountEl.textContent = `${sorted.length} ファイル`;
+      sorted.forEach(item => {
+        const fiLi = document.createElement('li');
+        fiLi.className = 'list-row' + (activeFileItem === item ? ' active' : '');
+        fiLi.dataset.path = item.relativePath;
+        const icon = getFileIcon(item.name);
+        const dateStr = new Date(item.lastModified).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        const dirPath = item.relativePath.split('/').slice(0, -1).join('/');
+
+        fiLi.innerHTML = `
+          <span class="row-icon">${icon}</span>
+          <div class="row-details">
+            <div class="row-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+            <div class="row-sub">
+              <span class="row-sub-path" title="${escapeHtml(dirPath)}">📁 ${escapeHtml(dirPath)}</span>
+              <span>${dateStr}</span>
+            </div>
+          </div>
+        `;
+        fiLi.addEventListener('click', () => displayFileContent(item, true));
+        itemListEl.appendChild(fiLi);
+      });
+    }
+
+    function renderBreadcrumbs() {
+      breadcrumbEl.innerHTML = '';
+      const pathNodes = [];
+      let temp = currentFolderNode;
+      while (temp) { pathNodes.unshift(temp); temp = temp.parent; }
+      pathNodes.forEach((node, idx) => {
+        if (idx > 0) {
+          const sep = document.createElement('span');
+          sep.className = 'crumb-separator';
+          sep.textContent = '/';
+          breadcrumbEl.appendChild(sep);
+        }
+        const isLast = (idx === pathNodes.length - 1);
+        const item = document.createElement('span');
+        item.textContent = node.name;
+        if (isLast) { item.className = 'crumb-current'; }
+        else {
+          item.className = 'crumb-item';
+          item.addEventListener('click', () => {
+            currentFolderNode = node;
+            renderSidebar();
+          });
+        }
+        breadcrumbEl.appendChild(item);
+      });
+    }
+
+    function renderDirectoryContents() {
+      itemListEl.innerHTML = '';
+      if (currentFolderNode.parent) {
+        const upLi = document.createElement('li');
+        upLi.className = 'list-row folder-row';
+        upLi.innerHTML = `<span class="row-icon">📁</span><div class="row-details"><div class="row-name">.. (上位フォルダへ)</div></div>`;
+        upLi.addEventListener('click', () => {
+          currentFolderNode = currentFolderNode.parent;
+          renderSidebar();
+        });
+        itemListEl.appendChild(upLi);
+      }
+
+      const subDirs = Array.from(currentFolderNode.subFolders.values()).sort((a, b) => a.name.localeCompare(b.name));
+      subDirs.forEach(folder => {
+        const fLi = document.createElement('li');
+        fLi.className = 'list-row folder-row';
+        const count = countFilesInDir(folder);
+        fLi.innerHTML = `
+          <span class="row-icon" style="color: var(--folder-color);">📁</span>
+          <div class="row-details">
+            <div class="row-name">${escapeHtml(folder.name)}</div>
+            <div class="row-sub"><span>フォルダ</span><span>${count} ファイル</span></div>
+          </div>
+        `;
+        fLi.addEventListener('click', () => {
+          currentFolderNode = folder;
+          renderSidebar();
+        });
+        itemListEl.appendChild(fLi);
+      });
+
+      const sorted = [...currentFolderNode.files].sort((a, b) => sortDesc ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name));
+      sorted.forEach(item => {
+        const fiLi = document.createElement('li');
+        fiLi.className = 'list-row' + (activeFileItem === item ? ' active' : '');
+        fiLi.dataset.path = item.relativePath;
+        const icon = getFileIcon(item.name);
+        const dateStr = new Date(item.lastModified).toLocaleDateString('ja-JP', { year: 'numeric', month: '2-digit', day: '2-digit' });
+        const sizeStr = `${(item.size / 1024).toFixed(1)} KB`;
+
+        fiLi.innerHTML = `
+          <span class="row-icon">${icon}</span>
+          <div class="row-details">
+            <div class="row-name">${escapeHtml(item.name)}</div>
+            <div class="row-sub"><span>${dateStr}</span><span>${sizeStr}</span></div>
+          </div>
+        `;
+        fiLi.addEventListener('click', () => displayFileContent(item, true));
+        itemListEl.appendChild(fiLi);
+      });
+
+      itemCountEl.textContent = `${subDirs.length + sorted.length} 項目`;
+    }
+
+    function renderSearchResults(keyword) {
+      breadcrumbEl.innerHTML = `<span class="crumb-current">🔍 検索: "${escapeHtml(keyword)}"</span>`;
+      itemListEl.innerHTML = '';
+      const matched = allFilesList.filter(item => 
+        item.name.toLowerCase().includes(keyword) || 
+        item.relativePath.toLowerCase().includes(keyword)
+      ).sort((a, b) => sortDesc ? b.name.localeCompare(a.name) : a.name.localeCompare(b.name));
+
+      itemCountEl.textContent = `${matched.length} 件ヒット`;
+      matched.forEach(item => {
+        const li = document.createElement('li');
+        li.className = 'list-row' + (activeFileItem === item ? ' active' : '');
+        li.dataset.path = item.relativePath;
+        li.innerHTML = `
+          <span class="row-icon">${getFileIcon(item.name)}</span>
+          <div class="row-details">
+            <div class="row-name">${escapeHtml(item.name)}</div>
+            <div class="row-sub"><span>${escapeHtml(item.relativePath)}</span></div>
+          </div>
+        `;
+        li.addEventListener('click', () => displayFileContent(item, true));
+        itemListEl.appendChild(li);
+      });
+    }
+
+    contentBody.addEventListener('click', (e) => {
+      const anchor = e.target.closest('a');
+      if (!anchor) return;
+      const href = anchor.getAttribute('href');
+      if (!href) return;
+      if (href.startsWith('#')) {
+        e.preventDefault();
+        const rawTarget = href.slice(1);
+        let targetId = '';
+        try { targetId = decodeURIComponent(rawTarget).trim().toLowerCase(); } catch (err) { targetId = rawTarget.trim().toLowerCase(); }
+        if (!targetId) return;
+        const headings = Array.from(markdownView.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+        let targetEl = markdownView.querySelector(`[id="${CSS.escape(targetId)}"]`) || document.getElementById(targetId);
+        if (!targetEl) {
+          targetEl = headings.find(h => {
+            const hId = (h.id || '').toLowerCase();
+            const hText = h.textContent.trim().toLowerCase().replace(/\s+/g, '-');
+            return hId === targetId || hText === targetId || h.textContent.trim().toLowerCase() === targetId;
+          });
+        }
+        if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (/^https?:\/\//i.test(href)) {
+        anchor.setAttribute('target', '_blank');
+        anchor.setAttribute('rel', 'noopener noreferrer');
+      }
+    });
+
+    function attachHeadingIds(container) {
+      const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      const usedIds = new Set();
+      headings.forEach(h => {
+        let baseSlug = (h.id || h.textContent || '').trim().toLowerCase()
+          .replace(/[^\w\u3000-\u30FE\u4E00-\u9FA5\uF900-\uFA2D\s-]/g, '').replace(/\s+/g, '-');
+        if (!baseSlug) baseSlug = 'section';
+        let uniqueId = baseSlug;
+        let count = 1;
+        while (usedIds.has(uniqueId)) { uniqueId = `${baseSlug}-${count++}`; }
+        usedIds.add(uniqueId);
+        h.id = uniqueId;
+      });
+    }
+
+    /* 改行の強制維持とフォールバック */
+    function renderMarkdown(md) {
+      if (!md) return '';
+      if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
+        try {
+          // 単一改行を <br> に変換する設定を直接引数で渡す
+          const res = marked.parse(md, { breaks: true, gfm: true });
+          if (typeof res === 'string') return res;
+        } catch (e) {}
+      }
+      // marked.js 未ロード（オフライン）時は改行を <br> に置換して表示
+      return escapeHtml(md).replace(/\n/g, '<br>');
+    }
+
+    function parseCSV(text, delimiter = ',') {
+      const rows = [];
+      let row = [];
+      let entry = '';
+      let insideQuote = false;
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const nextChar = text[i + 1];
+        if (char === '"') {
+          if (insideQuote && nextChar === '"') { entry += '"'; i++; }
+          else { insideQuote = !insideQuote; }
+        } else if (char === delimiter && !insideQuote) {
+          row.push(entry); entry = '';
+        } else if ((char === '\r' || char === '\n') && !insideQuote) {
+          if (char === '\r' && nextChar === '\n') i++;
+          row.push(entry); entry = '';
+          if (row.length > 1 || row[0] !== '') rows.push(row);
+          row = [];
+        } else { entry += char; }
+      }
+      if (entry || row.length > 0) { row.push(entry); rows.push(row); }
+      return rows;
+    }
+
+    function renderCSVTable(text, delimiter) {
+      const data = parseCSV(text, delimiter);
+      if (data.length === 0) return '<p style="color:var(--text-secondary);">データが空です</p>';
+      let html = `<div class="csv-info-badge">全 ${data.length} 行 / ${data[0].length} 列</div><table class="csv-table">`;
+      data.forEach((row, rowIndex) => {
+        html += '<tr>';
+        const isHeader = rowIndex === 0;
+        row.forEach(cell => {
+          const tag = isHeader ? 'th' : 'td';
+          html += `<${tag}>${escapeHtml(cell)}</${tag}>`;
+        });
+        html += '</tr>';
+      });
+      html += '</table>';
+      return html;
+    }
+
+    function getNodePath(node) {
+      const parts = [];
+      let temp = node;
+      while (temp && temp.parent) { parts.unshift(temp.name); temp = temp.parent; }
+      return parts;
+    }
+
+    function findNodeByPath(root, pathParts) {
+      let current = root;
+      for (const part of pathParts) {
+        if (!current.subFolders.has(part)) return null;
+        current = current.subFolders.get(part);
+      }
+      return current;
+    }
+
+    function countFilesInDir(node) {
+      let count = node.files.length;
+      for (const sub of node.subFolders.values()) count += countFilesInDir(sub);
+      return count;
+    }
+
+    function getFileIcon(filename) {
+      const ext = filename.split('.').pop().toLowerCase();
+      if (['csv', 'tsv'].includes(ext)) return '📊';
+      return '📝';
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>'"]/g, 
+        tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+      );
+    }
+  </script>
+</body>
+</html>

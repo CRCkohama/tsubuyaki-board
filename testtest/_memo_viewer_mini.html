@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>メモビューア (Mini)</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    :root {
+      --bg-primary: #f8fafc;
+      --bg-secondary: #ffffff;
+      --border-color: #e2e8f0;
+      --text-primary: #1e293b;
+      --text-secondary: #64748b;
+      --accent: #2563eb;
+      --accent-hover: #1d4ed8;
+      --success: #16a34a;
+      --success-hover: #15803d;
+      --list-hover: #f1f5f9;
+      --code-bg: #f1f5f9;
+      --table-header-bg: #f1f5f9;
+      --table-alt-row: #f8fafc;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background-color: var(--bg-secondary);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .mini-header {
+      padding: 10px 20px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background-color: var(--bg-primary);
+      flex-shrink: 0;
+      gap: 16px;
+    }
+
+    .file-meta-area { min-width: 0; flex: 1; }
+
+    .current-file-name {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .current-file-path {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .header-controls-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background-color: var(--accent);
+      color: #fff;
+      padding: 6px 14px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 500;
+      transition: background-color 0.15s;
+    }
+
+    .action-btn:hover { background-color: var(--accent-hover); }
+    .action-btn.success { background-color: var(--success); }
+    .action-btn.success:hover { background-color: var(--success-hover); }
+
+    .action-btn.secondary {
+      background-color: transparent;
+      color: var(--text-primary);
+      border: 1px solid var(--border-color);
+    }
+    .action-btn.secondary:hover { background-color: var(--list-hover); }
+
+    .encoding-select {
+      font-size: 0.8rem;
+      padding: 5px 8px;
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      background-color: #fff;
+      color: var(--text-primary);
+      outline: none;
+    }
+
+    .view-toggle {
+      display: inline-flex;
+      background-color: var(--border-color);
+      border-radius: 6px;
+      padding: 2px;
+    }
+
+    .toggle-btn {
+      border: none;
+      background: transparent;
+      padding: 4px 10px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      border-radius: 4px;
+      cursor: pointer;
+      color: var(--text-secondary);
+      transition: all 0.15s;
+    }
+
+    .toggle-btn.active {
+      background-color: #ffffff;
+      color: var(--accent);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .content-body {
+      flex: 1;
+      padding: 24px 32px;
+      overflow-y: auto;
+      position: relative;
+      scroll-behavior: smooth;
+    }
+
+    .status-placeholder {
+      height: 70vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      gap: 12px;
+    }
+
+    /* エディタ（ＭＳ ゴシック） */
+    .editor-container {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .edit-textarea {
+      width: 100%;
+      height: 100%;
+      padding: 16px;
+      font-family: "ＭＳ ゴシック", "MS Gothic", monospace;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      outline: none;
+      background-color: var(--bg-secondary);
+      color: var(--text-primary);
+      resize: none;
+    }
+
+    .edit-textarea:focus { border-color: var(--accent); }
+
+    /* ソース (Raw) 表示エリア（ＭＳ ゴシック） */
+    pre.raw-text {
+      font-family: "ＭＳ ゴシック", "MS Gothic", monospace;
+      font-size: 0.95rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--text-primary);
+    }
+
+    .markdown-body {
+      font-size: 0.95rem;
+      line-height: 1.7;
+      color: var(--text-primary);
+      max-width: 960px;
+    }
+
+    .markdown-body p {
+      margin-bottom: 0.8em;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .markdown-body h1, .markdown-body h2, .markdown-body h3, 
+    .markdown-body h4, .markdown-body h5, .markdown-body h6 {
+      margin-top: 1.4em;
+      margin-bottom: 0.6em;
+      font-weight: 600;
+      line-height: 1.3;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.3em;
+      scroll-margin-top: 16px;
+    }
+
+    .markdown-body h1 { font-size: 1.6rem; }
+    .markdown-body h2 { font-size: 1.35rem; }
+    .markdown-body h3 { font-size: 1.15rem; }
+
+    /* リスト余白と改行制御 */
+    .markdown-body ul, .markdown-body ol {
+      margin-top: 0.3em;
+      margin-bottom: 0.8em;
+      padding-left: 2em;
+    }
+    .markdown-body li {
+      margin-bottom: 0.15em;
+      line-height: 1.5;
+      white-space: normal;
+    }
+    .markdown-body li > ul,
+    .markdown-body li > ol {
+      margin-top: 0.1em;
+      margin-bottom: 0.1em;
+    }
+    .markdown-body li > p {
+      margin-top: 0.1em;
+      margin-bottom: 0.1em;
+      white-space: pre-wrap;
+    }
+
+    .markdown-body a {
+      color: var(--accent);
+      text-decoration: underline;
+      cursor: pointer;
+    }
+    .markdown-body a:hover { color: var(--accent-hover); }
+
+    .markdown-body blockquote {
+      margin: 1em 0;
+      padding: 0.5em 1em;
+      color: var(--text-secondary);
+      background-color: var(--bg-primary);
+      border-left: 4px solid var(--accent);
+      border-radius: 0 4px 4px 0;
+      white-space: pre-wrap;
+    }
+
+    .markdown-body code {
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 0.88em;
+      background-color: var(--code-bg);
+      padding: 2px 6px;
+      border-radius: 4px;
+      border: 1px solid var(--border-color);
+    }
+
+    .markdown-body pre {
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 14px;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 1em 0;
+      white-space: pre;
+    }
+
+    .markdown-body pre code { background: none; color: inherit; padding: 0; border: none; }
+    .markdown-body table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.9rem; }
+    .markdown-body th, .markdown-body td { border: 1px solid var(--border-color); padding: 8px 12px; text-align: left; }
+    .markdown-body th { background-color: var(--bg-primary); font-weight: 600; }
+    .markdown-body hr { border: 0; height: 1px; background-color: var(--border-color); margin: 1.5em 0; }
+
+    .csv-container { width: 100%; overflow-x: auto; }
+    .csv-table {
+      border-collapse: collapse;
+      font-size: 0.88rem;
+      white-space: nowrap;
+      min-width: 100%;
+      border: 1px solid var(--border-color);
+    }
+
+    .csv-table th {
+      background-color: var(--table-header-bg);
+      border: 1px solid var(--border-color);
+      padding: 8px 12px;
+      text-align: left;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+    }
+
+    .csv-table td { border: 1px solid var(--border-color); padding: 6px 12px; }
+    .csv-table tr:nth-child(even) td { background-color: var(--table-alt-row); }
+    .csv-table tr:hover td { background-color: var(--list-hover); }
+
+    .csv-info-badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    #legacyFileInput { display: none; }
+  </style>
+</head>
+<body>
+
+  <header class="mini-header" id="miniHeader">
+    <div class="file-meta-area">
+      <div id="selectedFileName" class="current-file-name">ファイル未選択</div>
+      <div id="selectedFilePath" class="current-file-path">右上の「📁 ファイルを開く」から選択できます</div>
+    </div>
+
+    <div class="header-controls-right">
+      <button id="btnOpenFile" class="action-btn" title="ローカルファイルを開く">📁 ファイルを開く</button>
+      <input type="file" id="legacyFileInput">
+      <button id="btnReloadMini" class="action-btn secondary" title="ディスクから最新内容を再読み込み">🔄 更新</button>
+      <button id="btnEdit" class="action-btn secondary" title="ファイルを編集" style="display: none;">✏️ 編集</button>
+      <button id="btnSave" class="action-btn success" style="display: none;" title="上書き保存 (Ctrl+S)">💾 保存</button>
+      <button id="btnCancelEdit" class="action-btn secondary" style="display: none;" title="編集を破棄して戻る">キャンセル</button>
+
+      <select id="encodingSelect" class="encoding-select" title="文字コード手動切り替え" style="display: none;">
+        <option value="auto">自動判別</option>
+        <option value="utf-8">UTF-8</option>
+        <option value="shift_jis">Shift_JIS</option>
+        <option value="euc-jp">EUC-JP</option>
+      </select>
+      <div class="view-toggle" id="viewToggleGroup" style="display: none;">
+        <button id="btnPreview" class="toggle-btn active">プレビュー</button>
+        <button id="btnRaw" class="toggle-btn">ソース (Raw)</button>
+      </div>
+    </div>
+  </header>
+
+  <div id="contentBody" class="content-body">
+    <div id="placeholder" class="status-placeholder">
+      <span>ファイルが読み込まれていません。右上の「📁 ファイルを開く」をクリックしてください。</span>
+    </div>
+    <div id="editorContainer" class="editor-container" style="display: none;">
+      <textarea id="editTextarea" class="edit-textarea" placeholder="テキストを入力..."></textarea>
+    </div>
+    <div id="markdownView" class="markdown-body" style="display: none;"></div>
+    <div id="csvView" class="csv-container" style="display: none;"></div>
+    <pre id="rawView" class="raw-text" style="display: none;"></pre>
+  </div>
+
+  <script>
+    let fileInfo = null;
+    let fileHandle = null;
+    let currentRawBuffer = null;
+    let currentRawContent = '';
+    let isPreviewMode = true;
+    let isEditMode = false;
+
+    const miniHeader = document.getElementById('miniHeader');
+    const selectedFileName = document.getElementById('selectedFileName');
+    const selectedFilePath = document.getElementById('selectedFilePath');
+    const contentBody = document.getElementById('contentBody');
+    const placeholder = document.getElementById('placeholder');
+    const editorContainer = document.getElementById('editorContainer');
+    const editTextarea = document.getElementById('editTextarea');
+    const markdownView = document.getElementById('markdownView');
+    const csvView = document.getElementById('csvView');
+    const rawView = document.getElementById('rawView');
+    const btnOpenFile = document.getElementById('btnOpenFile');
+    const legacyFileInput = document.getElementById('legacyFileInput');
+    const btnReloadMini = document.getElementById('btnReloadMini');
+    const btnPreview = document.getElementById('btnPreview');
+    const btnRaw = document.getElementById('btnRaw');
+    const encodingSelect = document.getElementById('encodingSelect');
+    const btnEdit = document.getElementById('btnEdit');
+    const btnSave = document.getElementById('btnSave');
+    const btnCancelEdit = document.getElementById('btnCancelEdit');
+    const viewToggleGroup = document.getElementById('viewToggleGroup');
+
+    function applyReceivedData(data) {
+      if (!data) return;
+      fileInfo = {
+        name: data.name,
+        relativePath: data.relativePath || data.name,
+        lastModified: data.lastModified || Date.now(),
+        size: data.size || (new Blob([data.content || '']).size),
+        encoding: data.encoding || 'UTF-8',
+        lineBreak: data.lineBreak || 'LF'
+      };
+      if (data.handle) {
+        fileHandle = data.handle;
+      }
+      currentRawContent = data.content || '';
+      currentRawBuffer = new TextEncoder().encode(currentRawContent).buffer;
+      isPreviewMode = !data.isRawMode;
+
+      document.title = `${fileInfo.name} - メモビューア (Mini)`;
+      placeholder.style.display = 'none';
+      btnEdit.style.display = 'inline-flex';
+      encodingSelect.style.display = 'inline-block';
+      viewToggleGroup.style.display = 'inline-flex';
+
+      updateMetaInfo();
+      updateViewToggleUI();
+      renderBody();
+    }
+
+    // URLハッシュ初期ロード
+    function loadFromUrlHash() {
+      if (window.location.hash && window.location.hash.length > 1) {
+        try {
+          const raw = decodeURIComponent(window.location.hash.substring(1));
+          const parsed = JSON.parse(raw);
+          applyReceivedData(parsed);
+          return true;
+        } catch (e) {}
+      }
+      return false;
+    }
+
+    // 親からのpostMessage受信（Chromeではここでhandleが渡る）
+    window.addEventListener('message', (event) => {
+      if (event.data && event.data.type === 'RENDER_FILE') {
+        applyReceivedData(event.data);
+      }
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+      loadFromUrlHash();
+      // 親画面に準備完了を通知してハンドル受取を促す
+      if (window.opener && !window.opener.closed) {
+        try { window.opener.postMessage({ type: 'MINI_VIEWER_READY' }, '*'); } catch (e) {}
+      }
+    });
+
+    /* --------------------------------------------------
+       単独起動用：ファイルを開く処理
+    -------------------------------------------------- */
+    btnOpenFile.addEventListener('click', async () => {
+      if ('showOpenFilePicker' in window) {
+        try {
+          const [handle] = await window.showOpenFilePicker({
+            types: [
+              {
+                description: 'テキスト・メモ・CSVファイル',
+                accept: {
+                  'text/*': ['.txt', '.md', '.markdown', '.log', '.csv', '.tsv']
+                }
+              }
+            ]
+          });
+          fileHandle = handle;
+          await loadFromCurrentHandle();
+        } catch (err) {
+          if (err.name !== 'AbortError') console.error(err);
+        }
+      } else {
+        legacyFileInput.click();
+      }
+    });
+
+    legacyFileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      fileHandle = null;
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        currentRawBuffer = evt.target.result;
+        const decoded = decodeTextBuffer(currentRawBuffer, 'auto');
+        currentRawContent = decoded.text;
+        fileInfo = {
+          name: file.name,
+          relativePath: file.name,
+          lastModified: file.lastModified,
+          size: file.size,
+          encoding: decoded.detectedEncoding,
+          lineBreak: detectLineBreak(decoded.text)
+        };
+        placeholder.style.display = 'none';
+        btnEdit.style.display = 'inline-flex';
+        encodingSelect.style.display = 'inline-block';
+        viewToggleGroup.style.display = 'inline-flex';
+        updateMetaInfo();
+        renderBody();
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    async function loadFromCurrentHandle() {
+      if (!fileHandle) return;
+      const fileObj = await fileHandle.getFile();
+      currentRawBuffer = await fileObj.arrayBuffer();
+      const decoded = decodeTextBuffer(currentRawBuffer, encodingSelect.value || 'auto');
+      currentRawContent = decoded.text;
+
+      fileInfo = {
+        name: fileObj.name,
+        relativePath: fileObj.name,
+        lastModified: fileObj.lastModified,
+        size: fileObj.size,
+        encoding: decoded.detectedEncoding,
+        lineBreak: detectLineBreak(decoded.text)
+      };
+
+      document.title = `${fileInfo.name} - メモビューア (Mini)`;
+      placeholder.style.display = 'none';
+      btnEdit.style.display = 'inline-flex';
+      encodingSelect.style.display = 'inline-block';
+      viewToggleGroup.style.display = 'inline-flex';
+
+      updateMetaInfo();
+      renderBody();
+    }
+
+    /* --------------------------------------------------
+       ディスク直接再読込処理 (更新検知)
+    -------------------------------------------------- */
+    async function reloadContentDirectly() {
+      if (isEditMode || !fileHandle) return;
+      try {
+        const fileObj = await fileHandle.getFile();
+        if (fileObj.lastModified !== fileInfo.lastModified || fileObj.size !== fileInfo.size) {
+          currentRawBuffer = await fileObj.arrayBuffer();
+          const decoded = decodeTextBuffer(currentRawBuffer, encodingSelect.value || 'auto');
+          if (decoded.text !== currentRawContent) {
+            fileInfo.lastModified = fileObj.lastModified;
+            fileInfo.size = fileObj.size;
+            fileInfo.encoding = decoded.detectedEncoding;
+            fileInfo.lineBreak = detectLineBreak(decoded.text);
+            currentRawContent = decoded.text;
+            updateMetaInfo();
+            renderBody();
+          }
+        }
+      } catch (err) {
+        console.warn('再読込失敗:', err);
+      }
+    }
+
+    window.addEventListener('focus', () => reloadContentDirectly());
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') reloadContentDirectly();
+    });
+
+    btnReloadMini.addEventListener('click', async () => {
+      if (isEditMode) return;
+      if (!fileHandle) {
+        // ハンドル未保持時は直接ファイル選択を起動
+        btnOpenFile.click();
+        return;
+      }
+      try {
+        await loadFromCurrentHandle();
+      } catch (err) {
+        alert('ファイルの再読み込みに失敗しました: ' + err.message);
+      }
+    });
+
+    function decodeTextBuffer(buffer, targetEncoding) {
+      if (targetEncoding !== 'auto') {
+        const decoder = new TextDecoder(targetEncoding);
+        return { text: decoder.decode(buffer), detectedEncoding: targetEncoding.toUpperCase() };
+      }
+      try {
+        const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
+        return { text: utf8Decoder.decode(buffer), detectedEncoding: 'UTF-8' };
+      } catch (e) {}
+      try {
+        const sjisDecoder = new TextDecoder('shift_jis', { fatal: true });
+        return { text: sjisDecoder.decode(buffer), detectedEncoding: 'Shift_JIS' };
+      } catch (e) {}
+      try {
+        const eucDecoder = new TextDecoder('euc-jp', { fatal: true });
+        return { text: eucDecoder.decode(buffer), detectedEncoding: 'EUC-JP' };
+      } catch (e) {}
+      return { text: new TextDecoder('utf-8').decode(buffer), detectedEncoding: 'UTF-8' };
+    }
+
+    function detectLineBreak(text) {
+      if (text.includes('\r\n')) return 'CRLF';
+      if (text.includes('\n')) return 'LF';
+      if (text.includes('\r')) return 'CR';
+      return '単一行';
+    }
+
+    encodingSelect.addEventListener('change', () => {
+      if (!currentRawBuffer || !fileInfo) return;
+      const decoded = decodeTextBuffer(currentRawBuffer, encodingSelect.value);
+      currentRawContent = decoded.text;
+      fileInfo.encoding = decoded.detectedEncoding;
+      updateMetaInfo();
+      if (!isEditMode) renderBody();
+    });
+
+    function updateMetaInfo() {
+      if (!fileInfo) return;
+      selectedFileName.textContent = fileInfo.name;
+      const sizeKb = (fileInfo.size / 1024).toFixed(1);
+      const dateStr = new Date(fileInfo.lastModified).toLocaleString('ja-JP');
+      selectedFilePath.textContent = `${fileInfo.relativePath} [${fileInfo.encoding} / 改行:${fileInfo.lineBreak}] (${sizeKb} KB / 更新: ${dateStr})`;
+    }
+
+    btnPreview.addEventListener('click', () => {
+      if (isPreviewMode) return;
+      isPreviewMode = true;
+      updateViewToggleUI();
+      renderBody();
+    });
+
+    btnRaw.addEventListener('click', () => {
+      if (!isPreviewMode) return;
+      isPreviewMode = false;
+      updateViewToggleUI();
+      renderBody();
+    });
+
+    function updateViewToggleUI() {
+      if (isPreviewMode) {
+        btnPreview.classList.add('active');
+        btnRaw.classList.remove('active');
+      } else {
+        btnRaw.classList.add('active');
+        btnPreview.classList.remove('active');
+      }
+    }
+
+    function renderBody() {
+      if (!fileInfo) return;
+      const ext = (fileInfo.name.split('.').pop() || '').toLowerCase();
+      const isCsv = (ext === 'csv');
+      const isTsv = (ext === 'tsv');
+
+      if (isPreviewMode) {
+        rawView.style.display = 'none';
+        if (isCsv || isTsv) {
+          markdownView.style.display = 'none';
+          csvView.style.display = 'block';
+          csvView.innerHTML = renderCSVTable(currentRawContent, isTsv ? '\t' : ',');
+        } else {
+          csvView.style.display = 'none';
+          markdownView.style.display = 'block';
+          markdownView.innerHTML = renderMarkdown(currentRawContent);
+          attachHeadingIds(markdownView);
+        }
+      } else {
+        markdownView.style.display = 'none';
+        csvView.style.display = 'none';
+        rawView.style.display = 'block';
+        rawView.textContent = currentRawContent;
+      }
+    }
+
+    /* --------------------------------------------------
+       エディタ編集 & 保存
+    -------------------------------------------------- */
+    btnEdit.addEventListener('click', () => enterEditMode());
+
+    btnCancelEdit.addEventListener('click', () => {
+      if (editTextarea.value !== currentRawContent) {
+        if (!confirm('変更内容を破棄して戻りますか？')) return;
+      }
+      exitEditMode();
+      renderBody();
+    });
+
+    btnSave.addEventListener('click', () => executeSave());
+
+    function enterEditMode() {
+      isEditMode = true;
+      editTextarea.value = currentRawContent;
+      markdownView.style.display = 'none';
+      csvView.style.display = 'none';
+      rawView.style.display = 'none';
+      editorContainer.style.display = 'flex';
+
+      btnOpenFile.style.display = 'none';
+      btnEdit.style.display = 'none';
+      btnSave.style.display = 'inline-flex';
+      btnCancelEdit.style.display = 'inline-flex';
+      btnReloadMini.style.display = 'none';
+      viewToggleGroup.style.display = 'none';
+      editTextarea.focus();
+    }
+
+    function exitEditMode() {
+      isEditMode = false;
+      editorContainer.style.display = 'none';
+      btnOpenFile.style.display = 'inline-flex';
+      btnEdit.style.display = 'inline-flex';
+      btnSave.style.display = 'none';
+      btnCancelEdit.style.display = 'none';
+      btnReloadMini.style.display = 'inline-flex';
+      viewToggleGroup.style.display = 'inline-flex';
+    }
+
+    async function executeSave() {
+      const newText = editTextarea.value;
+      try {
+        if (fileHandle && fileHandle.createWritable) {
+          const writable = await fileHandle.createWritable();
+          await writable.write(newText);
+          await writable.close();
+
+          currentRawContent = newText;
+          currentRawBuffer = new TextEncoder().encode(newText).buffer;
+          const fileObj = await fileHandle.getFile();
+          fileInfo.lastModified = fileObj.lastModified;
+          fileInfo.size = fileObj.size;
+          updateMetaInfo();
+        } else {
+          const blob = new Blob([newText], { type: 'text/plain;charset=utf-8' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = fileInfo.name;
+          a.click();
+          URL.revokeObjectURL(a.href);
+          currentRawContent = newText;
+        }
+        exitEditMode();
+        renderBody();
+      } catch (err) {
+        alert('保存に失敗しました: ' + err.message);
+      }
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+        if (isEditMode) {
+          e.preventDefault();
+          executeSave();
+        }
+      }
+    });
+
+    /* --------------------------------------------------
+       アンカーリンク & Markdown処理
+    -------------------------------------------------- */
+    contentBody.addEventListener('click', (e) => {
+      const anchor = e.target.closest('a');
+      if (!anchor) return;
+      const href = anchor.getAttribute('href');
+      if (!href) return;
+      if (href.startsWith('#')) {
+        e.preventDefault();
+        const rawTarget = href.slice(1);
+        let targetId = '';
+        try { targetId = decodeURIComponent(rawTarget).trim().toLowerCase(); } catch (err) { targetId = rawTarget.trim().toLowerCase(); }
+        if (!targetId) return;
+        const headings = Array.from(markdownView.querySelectorAll('h1, h2, h3, h4, h5, h6'));
+        let targetEl = markdownView.querySelector(`[id="${CSS.escape(targetId)}"]`) || document.getElementById(targetId);
+        if (!targetEl) {
+          targetEl = headings.find(h => {
+            const hId = (h.id || '').toLowerCase();
+            const hText = h.textContent.trim().toLowerCase().replace(/\s+/g, '-');
+            return hId === targetId || hText === targetId || h.textContent.trim().toLowerCase() === targetId;
+          });
+        }
+        if (targetEl) targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } else if (/^https?:\/\//i.test(href)) {
+        anchor.setAttribute('target', '_blank');
+        anchor.setAttribute('rel', 'noopener noreferrer');
+      }
+    });
+
+    function attachHeadingIds(container) {
+      const headings = container.querySelectorAll('h1, h2, h3, h4, h5, h6');
+      const usedIds = new Set();
+      headings.forEach(h => {
+        let baseSlug = (h.id || h.textContent || '').trim().toLowerCase()
+          .replace(/[^\w\u3000-\u30FE\u4E00-\u9FA5\uF900-\uFA2D\s-]/g, '').replace(/\s+/g, '-');
+        if (!baseSlug) baseSlug = 'section';
+        let uniqueId = baseSlug;
+        let count = 1;
+        while (usedIds.has(uniqueId)) { uniqueId = `${baseSlug}-${count++}`; }
+        usedIds.add(uniqueId);
+        h.id = uniqueId;
+      });
+    }
+
+    function renderMarkdown(md) {
+      if (!md) return '';
+      if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
+        try {
+          const res = marked.parse(md, { breaks: true, gfm: true });
+          if (typeof res === 'string') return res;
+        } catch (e) {}
+      }
+      return escapeHtml(md).replace(/\n/g, '<br>');
+    }
+
+    function parseCSV(text, delimiter = ',') {
+      const rows = [];
+      let row = [];
+      let entry = '';
+      let insideQuote = false;
+      for (let i = 0; i < text.length; i++) {
+        const char = text[i];
+        const nextChar = text[i + 1];
+        if (char === '"') {
+          if (insideQuote && nextChar === '"') { entry += '"'; i++; }
+          else { insideQuote = !insideQuote; }
+        } else if (char === delimiter && !insideQuote) {
+          row.push(entry); entry = '';
+        } else if ((char === '\r' || char === '\n') && !insideQuote) {
+          if (char === '\r' && nextChar === '\n') i++;
+          row.push(entry); entry = '';
+          if (row.length > 1 || row[0] !== '') rows.push(row);
+          row = [];
+        } else { entry += char; }
+      }
+      if (entry || row.length > 0) { row.push(entry); rows.push(row); }
+      return rows;
+    }
+
+    function renderCSVTable(text, delimiter) {
+      const data = parseCSV(text, delimiter);
+      if (data.length === 0) return '<p style="color:var(--text-secondary);">データが空です</p>';
+      let html = `<div class="csv-info-badge">全 ${data.length} 行 / ${data[0].length} 列</div><table class="csv-table">`;
+      data.forEach((row, rowIndex) => {
+        html += '<tr>';
+        const isHeader = rowIndex === 0;
+        row.forEach(cell => {
+          const tag = isHeader ? 'th' : 'td';
+          html += `<${tag}>${escapeHtml(cell)}</${tag}>`;
+        });
+        html += '</tr>';
+      });
+      html += '</table>';
+      return html;
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/[&<>'"]/g, 
+        tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
+      );
+    }
+  </script>
+</body>
+</html>
