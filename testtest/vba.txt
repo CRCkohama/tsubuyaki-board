@@ -1,0 +1,438 @@
+Option Explicit
+
+'生成AI ChatGPTで作成
+
+#If VBA7 Then
+    Private Declare PtrSafe Function GetDC Lib "user32" ( _
+        ByVal hwnd As LongPtr) As LongPtr
+
+    Private Declare PtrSafe Function ReleaseDC Lib "user32" ( _
+        ByVal hwnd As LongPtr, ByVal hdc As LongPtr) As Long
+
+    Private Declare PtrSafe Function CreateFontW Lib "gdi32" ( _
+        ByVal nHeight As Long, _
+        ByVal nWidth As Long, _
+        ByVal nEscapement As Long, _
+        ByVal nOrientation As Long, _
+        ByVal fnWeight As Long, _
+        ByVal fdwItalic As Long, _
+        ByVal fdwUnderline As Long, _
+        ByVal fdwStrikeOut As Long, _
+        ByVal fdwCharSet As Long, _
+        ByVal fdwOutputPrecision As Long, _
+        ByVal fdwClipPrecision As Long, _
+        ByVal fdwQuality As Long, _
+        ByVal fdwPitchAndFamily As Long, _
+        ByVal lpszFace As LongPtr) As LongPtr
+
+    Private Declare PtrSafe Function SelectObject Lib "gdi32" ( _
+        ByVal hdc As LongPtr, ByVal hObject As LongPtr) As LongPtr
+
+    Private Declare PtrSafe Function DeleteObject Lib "gdi32" ( _
+        ByVal hObject As LongPtr) As Long
+
+    Private Declare PtrSafe Function GetTextExtentPoint32W Lib "gdi32" ( _
+        ByVal hdc As LongPtr, _
+        ByVal lpString As LongPtr, _
+        ByVal c As Long, _
+        ByRef lpSize As TEXTSIZE) As Long
+#End If
+
+Private Type TEXTSIZE
+    cx As Long
+    cy As Long
+End Type
+
+
+Sub MarkdownConvertToTextile__Markdown__Z()
+
+    Dim rng As Range
+    Dim currentCell As Range
+    Dim mergeArea As Range
+
+    Dim r As Long, c As Long
+    Dim rowCount As Long, colCount As Long
+
+    Dim data() As String
+    Dim colWidth() As Long
+    Dim textUnits As Long
+
+    Dim cellText As String
+    Dim s As String
+    Dim txt As String
+
+    Dim hdc As LongPtr
+    Dim hFont As LongPtr
+    Dim hOldFont As LongPtr
+
+    Dim fontName As String
+    Dim spaceWidth As Long
+
+    On Error GoTo ErrorHandler
+
+    If TypeName(Selection) <> "Range" Then
+        MsgBox "表を選択してください。", vbExclamation
+        Exit Sub
+    End If
+
+    Set rng = Selection
+
+    rowCount = rng.Rows.Count
+    colCount = rng.Columns.Count
+
+    ReDim data(1 To rowCount, 1 To colCount)
+    ReDim colWidth(1 To colCount)
+
+    '---------------------------------
+    ' MS ゴシックの文字幅測定環境を作成
+    '---------------------------------
+    fontName = "ＭＳ ゴシック"
+
+    hdc = GetDC(0)
+
+    If hdc = 0 Then
+        Err.Raise vbObjectError + 100, , _
+                  "文字幅測定用のデバイスを取得できません。"
+    End If
+
+    ' 高さ20のMS ゴシックを作成
+    hFont = CreateFontW( _
+        -20, 0, 0, 0, 400, 0, 0, 0, _
+        128, 0, 0, 5, 0, StrPtr(fontName))
+
+    If hFont = 0 Then
+        Err.Raise vbObjectError + 101, , _
+                  "MS ゴシックのフォントを作成できません。"
+    End If
+
+    hOldFont = SelectObject(hdc, hFont)
+
+    ' 半角スペース1文字の実測幅
+    spaceWidth = MeasureTextPixels(hdc, " ")
+
+    If spaceWidth <= 0 Then
+        Err.Raise vbObjectError + 102, , _
+                  "文字幅を測定できません。"
+    End If
+
+    '---------------------------------
+    ' セル文字列取得・列幅計算
+    '---------------------------------
+    For r = 1 To rowCount
+        For c = 1 To colCount
+
+            Set currentCell = rng.Cells(r, c)
+            cellText = ""
+
+            ' 結合セルの途中は空欄
+            If currentCell.MergeCells Then
+
+                Set mergeArea = currentCell.mergeArea
+
+                If currentCell.Address <> _
+                   mergeArea.Cells(1, 1).Address Then
+
+                    data(r, c) = ""
+                    GoTo ContinueMeasure
+
+                End If
+
+            End If
+
+            ' Excel上の表示文字列
+            cellText = CStr(currentCell.text)
+
+            ' セル内改行をMarkdown表現に変換
+            cellText = Replace(cellText, vbCrLf, "<br>")
+            cellText = Replace(cellText, vbCr, "<br>")
+            cellText = Replace(cellText, vbLf, "<br>")
+
+            ' Markdownエスケープ
+            cellText = Replace(cellText, "\", "\\")
+            cellText = Replace(cellText, "|", "\|")
+
+            data(r, c) = cellText
+
+ContinueMeasure:
+
+            ' 実測した文字幅をスペース単位に変換
+            textUnits = PixelsToUnits( _
+                MeasureTextPixels(hdc, data(r, c)), spaceWidth)
+
+            If textUnits > colWidth(c) Then
+                colWidth(c) = textUnits
+            End If
+
+            ' Markdown区切り行の最低幅は3
+            If colWidth(c) < 3 Then
+                colWidth(c) = 3
+            End If
+
+        Next c
+    Next r
+
+    '---------------------------------
+    ' Markdown表を生成
+    '---------------------------------
+    txt = ""
+
+    For r = 1 To rowCount
+
+        s = "|"
+
+        For c = 1 To colCount
+
+            textUnits = PixelsToUnits( _
+                MeasureTextPixels(hdc, data(r, c)), spaceWidth)
+
+            s = s & " " & data(r, c) & _
+                String(colWidth(c) - textUnits, " ") & " |"
+
+        Next c
+
+        txt = txt & s & vbCrLf
+
+        ' ヘッダー行の直後に区切り行
+        If r = 1 Then
+
+            s = "|"
+
+            For c = 1 To colCount
+                s = s & " " & _
+                    String(colWidth(c), "-") & " |"
+            Next c
+
+            txt = txt & s & vbCrLf
+
+        End If
+
+    Next r
+
+    '---------------------------------
+    ' クリップボードへコピー
+    '---------------------------------
+    With CreateObject("Forms.TextBox.1")
+        .MultiLine = True
+        .text = txt
+        .SelStart = 0
+        .SelLength = .TextLength
+        .Copy
+    End With
+
+    MsgBox "Markdown形式の表をコピーしました。" & vbCrLf & _
+           "SakuraエディタのMS ゴシックで確認してください。", _
+           vbInformation
+
+CleanUp:
+
+    On Error Resume Next
+
+    If hdc <> 0 Then
+        If hOldFont <> 0 Then
+            SelectObject hdc, hOldFont
+        End If
+
+        If hFont <> 0 Then
+            DeleteObject hFont
+        End If
+
+        ReleaseDC 0, hdc
+    End If
+
+    Exit Sub
+
+ErrorHandler:
+
+    MsgBox "エラーが発生しました。" & vbCrLf & _
+           Err.Description, vbExclamation
+
+    Resume CleanUp
+
+End Sub
+
+
+'---------------------------------
+' 指定フォントで文字列の幅をピクセル測定
+'---------------------------------
+Private Function MeasureTextPixels( _
+    ByVal hdc As LongPtr, _
+    ByVal txt As String) As Long
+
+    Dim sz As TEXTSIZE
+
+    If Len(txt) = 0 Then
+        MeasureTextPixels = 0
+        Exit Function
+    End If
+
+    If GetTextExtentPoint32W( _
+        hdc, StrPtr(txt), Len(txt), sz) = 0 Then
+
+        Err.Raise vbObjectError + 103, , _
+                  "文字列の幅を測定できません。"
+
+    End If
+
+    MeasureTextPixels = sz.cx
+
+End Function
+
+
+'---------------------------------
+' ピクセル幅を半角スペース単位に変換
+'---------------------------------
+Private Function PixelsToUnits( _
+    ByVal pixels As Long, _
+    ByVal spaceWidth As Long) As Long
+
+    If pixels <= 0 Then
+        PixelsToUnits = 0
+    Else
+        PixelsToUnits = _
+            (pixels + spaceWidth \ 2) \ spaceWidth
+    End If
+
+End Function
+
+
+'===================================================================================================
+' 機能　　　: 選択箇所をRedmine用の表形式に変換
+' 機能説明　: Excelで選択した表を、RedmineのTextile形式へ変換してクリップボードにコピー
+' 引数　　　: なし
+' 戻り値　　: なし
+' 備考　　　: 1行目をヘッダーとして出力 ChatGPTで作成
+'===================================================================================================
+Sub RedmineConvertToTextile__Redmine__Z()
+
+    Dim rng As Range
+    Dim r As Long, c As Long
+    Dim txt As String
+    Dim s As String
+    
+    Dim currentCell As Range
+    Dim mergeArea As Range
+    
+    Dim cellText As String
+    Dim prefix As String
+    
+    Dim mergeRows As Long
+    Dim mergeCols As Long
+
+
+    If TypeName(Selection) <> "Range" Then
+        MsgBox "表を選択してください。"
+        Exit Sub
+    End If
+
+    Set rng = Selection
+
+    txt = ""
+
+
+    For r = 1 To rng.Rows.Count
+
+        s = ""
+
+        For c = 1 To rng.Columns.Count
+
+            Set currentCell = rng.Cells(r, c)
+
+
+            '---------------------------------
+            ' 結合セル途中は出力しない
+            '---------------------------------
+            If currentCell.MergeCells Then
+                
+                Set mergeArea = currentCell.mergeArea
+                
+                If currentCell.Address <> mergeArea.Cells(1, 1).Address Then
+                    GoTo ContinueCell
+                End If
+                
+            End If
+
+
+            cellText = CStr(currentCell.text)
+            prefix = ""
+
+
+            '---------------------------------
+            ' 結合サイズ取得
+            '---------------------------------
+            If currentCell.MergeCells Then
+
+                mergeRows = mergeArea.Rows.Count
+                mergeCols = mergeArea.Columns.Count
+
+
+                '横結合（colspan）
+                If mergeCols > 1 Then
+                    prefix = "\" & mergeCols
+                End If
+
+
+                '縦結合（rowspan）
+                If mergeRows > 1 Then
+                    prefix = prefix & "/" & mergeRows
+                End If
+
+
+                If prefix <> "" Then
+                    prefix = prefix & ". "
+                End If
+
+            End If
+
+
+
+            '---------------------------------
+            ' Textileエスケープ
+            '---------------------------------
+            cellText = Replace(cellText, "|", "&#124;")
+            cellText = Replace(cellText, vbCrLf, "<br>")
+            cellText = Replace(cellText, vbLf, "<br>")
+
+
+
+            '---------------------------------
+            ' Textile表生成
+            '---------------------------------
+            If r = 1 Then
+                s = s & "|_." & prefix & cellText
+            Else
+                s = s & "|" & prefix & cellText
+            End If
+
+
+ContinueCell:
+
+        Next c
+
+
+        '行末
+        s = s & "|"
+
+        txt = txt & s & vbCrLf
+
+
+    Next r
+
+
+
+    '---------------------------------
+    ' クリップボードコピー
+    '---------------------------------
+    With CreateObject("Forms.TextBox.1")
+        .MultiLine = True
+        .text = txt
+        .SelStart = 0
+        .SelLength = .TextLength
+        .Copy
+    End With
+
+
+    MsgBox "Redmine Textile形式（結合対応）をコピーしました。"
+
+
+End Sub
+

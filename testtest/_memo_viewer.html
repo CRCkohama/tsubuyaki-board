@@ -447,14 +447,28 @@
       max-width: 960px;
     }
 
-    /* 段落内の単一改行は維持 */
     .markdown-body p {
       margin-bottom: 0.8em;
       white-space: pre-wrap;
       word-break: break-word;
     }
 
-    /* リストの余白と改行制御 */
+    .markdown-body h1, .markdown-body h2, .markdown-body h3, 
+    .markdown-body h4, .markdown-body h5, .markdown-body h6 {
+      margin-top: 1.4em;
+      margin-bottom: 0.6em;
+      font-weight: 600;
+      line-height: 1.3;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.3em;
+      scroll-margin-top: 16px;
+    }
+
+    .markdown-body h1 { font-size: 1.6rem; }
+    .markdown-body h2 { font-size: 1.35rem; }
+    .markdown-body h3 { font-size: 1.15rem; }
+
+    /* リスト余白と改行制御 */
     .markdown-body ul, .markdown-body ol {
       margin-top: 0.3em;
       margin-bottom: 0.8em;
@@ -465,13 +479,11 @@
       line-height: 1.5;
       white-space: normal;
     }
-    /* ネストされた子リストの余白（空行防止） */
     .markdown-body li > ul,
     .markdown-body li > ol {
       margin-top: 0.1em;
       margin-bottom: 0.1em;
     }
-    /* リスト直下の段落：改行を維持したまま余白を抑制 */
     .markdown-body li > p {
       margin-top: 0.1em;
       margin-bottom: 0.1em;
@@ -640,7 +652,7 @@
 
   <script>
     const USER_CONFIG = {
-      miniViewerHtml: '_memo_viewer_mini.html'
+      miniViewerHtml: 'memo_viewer_mini.html'
     };
 
     const SUPPORTED_EXTS = ['txt', 'md', 'markdown', 'log', 'text', 'csv', 'tsv'];
@@ -709,7 +721,7 @@
     const btnModeFlat = document.getElementById('btnModeFlat');
 
     /* --------------------------------------------------
-       フォルダを開く
+       フォルダを開く (Safari / Chromium 両対応)
     -------------------------------------------------- */
     btnOpenFolder.addEventListener('click', async () => {
       if ('showDirectoryPicker' in window) {
@@ -724,6 +736,7 @@
           if (err.name !== 'AbortError') console.error(err);
         }
       } else {
+        // Safari など FileSystem Access API 非対応環境
         legacyInput.click();
       }
     });
@@ -731,9 +744,53 @@
     legacyInput.addEventListener('change', (e) => {
       const files = Array.from(e.target.files);
       if (files.length === 0) return;
+      fileHistory = [];
+      historyIndex = -1;
+      updateHistoryButtons();
+      if (isEditMode) exitEditMode();
+      rootDirectoryHandle = null;
       buildLegacyTree(files);
       renderSidebar();
     });
+
+    /* Safari用: inputタグから取得したファイルリストでツリーを構築 */
+    function buildLegacyTree(files) {
+      allFilesList = [];
+      const firstPath = files[0].webkitRelativePath || files[0].name;
+      const rootName = firstPath.split('/')[0] || '選択フォルダ';
+      rootNode = new FolderNode(rootName, null, null);
+
+      for (const file of files) {
+        const pathStr = file.webkitRelativePath || file.name;
+        const parts = pathStr.split('/');
+        const fileName = parts.pop();
+        const ext = fileName.split('.').pop().toLowerCase();
+        if (!SUPPORTED_EXTS.includes(ext) && fileName.includes('.')) continue;
+
+        let currentNode = rootNode;
+        for (let i = 1; i < parts.length; i++) {
+          const folderName = parts[i];
+          if (!currentNode.subFolders.has(folderName)) {
+            const newNode = new FolderNode(folderName, currentNode, null);
+            currentNode.subFolders.set(folderName, newNode);
+          }
+          currentNode = currentNode.subFolders.get(folderName);
+        }
+
+        const fileItem = {
+          name: fileName,
+          relativePath: pathStr,
+          handle: null,
+          file: file,
+          lastModified: file.lastModified,
+          size: file.size,
+          parent: currentNode
+        };
+        currentNode.files.push(fileItem);
+        allFilesList.push(fileItem);
+      }
+      currentFolderNode = rootNode;
+    }
 
     /* --------------------------------------------------
        別タブ（USER_CONFIG.miniViewerHtml）連携
@@ -757,14 +814,12 @@
       const payload = getFilePayload();
       if (!payload) return;
       try {
-        // Chrome向け：ファイルハンドルを含めて片道送信
         miniViewerWindow.postMessage({
           type: 'RENDER_FILE',
           handle: activeFileItem ? activeFileItem.handle : null,
           ...payload
         }, '*');
       } catch (e) {
-        // Edge向け（ハンドル複製拒否時）：テキストデータのみ送信
         try {
           miniViewerWindow.postMessage({ type: 'RENDER_FILE', ...payload }, '*');
         } catch (err) {}
@@ -804,11 +859,17 @@
       if (!rootDirectoryHandle && !rootNode) return;
       if (isEditMode && !confirmLeaveEdit()) return;
       if (isEditMode) exitEditMode();
-      await refreshAll();
+
+      if (rootDirectoryHandle) {
+        await refreshAll();
+      } else {
+        // Safari環境ではブラウザセキュリティにより再スキャン時に再度ファイル選択が必要
+        legacyInput.click();
+      }
     });
 
     window.addEventListener('focus', async () => {
-      if (activeFileItem && !isEditMode) {
+      if (activeFileItem && !isEditMode && activeFileItem.handle) {
         await reloadCurrentFileOnly();
       }
     });
@@ -865,6 +926,7 @@
           activeFileItem.size = fileObj.size;
           currentRawBuffer = await fileObj.arrayBuffer();
           applyEncodingAndRender();
+          if (miniViewerWindow && !miniViewerWindow.closed) sendFileViaMessage();
         }
       } catch (e) {}
     }
@@ -889,16 +951,16 @@
       }
 
       try {
-        let fileObj = null;
         if (item.handle) {
-          fileObj = await item.handle.getFile();
+          const fileObj = await item.handle.getFile();
           item.lastModified = fileObj.lastModified;
           item.size = fileObj.size;
+          currentRawBuffer = await fileObj.arrayBuffer();
         } else if (item.file) {
-          fileObj = item.file;
+          // Safari 等の File オブジェクト
+          currentRawBuffer = await item.file.arrayBuffer();
         }
 
-        currentRawBuffer = await fileObj.arrayBuffer();
         placeholder.style.display = 'none';
         contentHeader.style.display = 'flex';
 
@@ -927,7 +989,7 @@
         return { text: eucDecoder.decode(buffer), detectedEncoding: 'EUC-JP' };
       } catch (e) {}
       const fallbackDecoder = new TextDecoder('utf-8');
-      return { text: fallbackDecoder.decode(buffer), detectedEncoding: 'UTF-8 (破損あり)' };
+      return { text: fallbackDecoder.decode(buffer), detectedEncoding: 'UTF-8' };
     }
 
     function detectLineBreak(text) {
@@ -986,7 +1048,7 @@
     }
 
     /* --------------------------------------------------
-       エディタ編集 & 保存
+       エディタ編集 & 保存 (Safari ダウンロード対応)
     -------------------------------------------------- */
     btnEdit.addEventListener('click', () => enterEditMode());
 
@@ -1027,11 +1089,19 @@
       encodingSelect.disabled = false;
     }
 
+    function confirmLeaveEdit() {
+      if (editTextarea.value !== currentRawContent) {
+        return confirm('編集中です。変更内容を破棄して移動しますか？');
+      }
+      return true;
+    }
+
     async function saveCurrentFile() {
       if (!activeFileItem) return;
       const newText = editTextarea.value;
       try {
         if (activeFileItem.handle && activeFileItem.handle.createWritable) {
+          // FileSystem Access API 対応ブラウザ（Chrome / Edge）
           const writable = await activeFileItem.handle.createWritable();
           await writable.write(newText);
           await writable.close();
@@ -1041,6 +1111,19 @@
           const fileObj = await activeFileItem.handle.getFile();
           activeFileItem.lastModified = fileObj.lastModified;
           activeFileItem.size = fileObj.size;
+        } else {
+          // Safari 等：直接ディスク書き込み不可のため Blob ダウンロード保存
+          const blob = new Blob([newText], { type: 'text/plain;charset=utf-8' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = activeFileItem.name;
+          a.click();
+          URL.revokeObjectURL(a.href);
+
+          currentRawContent = newText;
+          currentRawBuffer = new TextEncoder().encode(newText).buffer;
+          activeFileItem.lastModified = Date.now();
+          activeFileItem.size = blob.size;
         }
         exitEditMode();
         applyEncodingAndRender();
@@ -1348,17 +1431,14 @@
       });
     }
 
-    /* 改行の強制維持とフォールバック */
     function renderMarkdown(md) {
       if (!md) return '';
       if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
         try {
-          // 単一改行を <br> に変換する設定を直接引数で渡す
           const res = marked.parse(md, { breaks: true, gfm: true });
           if (typeof res === 'string') return res;
         } catch (e) {}
       }
-      // marked.js 未ロード（オフライン）時は改行を <br> に置換して表示
       return escapeHtml(md).replace(/\n/g, '<br>');
     }
 
